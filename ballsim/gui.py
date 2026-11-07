@@ -31,6 +31,10 @@ class App:
         self.fig: Figure | None = None
         self.canvas: FigureCanvasTkAgg | None = None
         self.axes: list[Axes] = []
+        self.anim_window: tk.Toplevel | None = None
+        self.anim_fig: Figure | None = None
+        self.anim_canvas: FigureCanvasTkAgg | None = None
+        self.animator = None
 
         form = ttk.Frame(root, padding=8)
         form.pack()
@@ -55,6 +59,7 @@ class App:
         ttk.Button(buttons, text="Load preset", command=self.load).pack(side="left")
         ttk.Button(buttons, text="Save preset", command=self.save).pack(side="left")
         ttk.Button(buttons, text="Run", command=self.run).pack(side="left")
+        ttk.Button(buttons, text="Animate", command=self.animate).pack(side="left")
         ttk.Button(buttons, text="Clear plots", command=self.clear).pack(side="left")
 
         self.keep = tk.BooleanVar(value=True)
@@ -133,6 +138,40 @@ class App:
         add_trajectory(self.plot_window_axes(), trajectory)
         self.canvas.draw()
         self.status.set(describe(trajectory))
+
+    def animate(self) -> None:
+        """Play one run as an animation in its own window, reusing the window."""
+        try:
+            from extras import animate as animation  # optional extra, the core does not need it
+        except ModuleNotFoundError:
+            self.status.set("animation extra not found")
+            return
+        try:
+            params = self.read_fields()
+            validate(params)
+        except ValueError as error:
+            self.status.set(str(error))
+            return
+        if self.anim_window is None or not self.anim_window.winfo_exists():
+            self.anim_window = tk.Toplevel(self.root)
+            self.anim_window.title("Animation")
+            self.anim_window.protocol("WM_DELETE_WINDOW", self.close_animation)
+        else:
+            self.animator.stop()
+            # the old canvas still holds the old animator's mouse and key handlers
+            self.anim_canvas.get_tk_widget().destroy()
+        self.anim_fig = Figure(figsize=(13, 8))
+        self.anim_canvas = FigureCanvasTkAgg(self.anim_fig, master=self.anim_window)
+        self.anim_canvas.get_tk_widget().pack(fill="both", expand=True)
+        self.animator = animation.Animator(self.anim_fig, params)
+        self.anim_canvas.draw()
+        self.anim_canvas.get_tk_widget().focus_set()  # key presses need focus
+        self.status.set(f"Animating {params.name}")
+
+    def close_animation(self) -> None:
+        """Stop the timer first so it does not draw into a destroyed window."""
+        self.animator.stop()
+        self.anim_window.destroy()
 
     def clear(self) -> None:
         self.plot_window_axes()
