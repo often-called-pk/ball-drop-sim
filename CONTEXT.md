@@ -87,3 +87,17 @@ _Avoid_: end time, duration
 **Trajectory**:
 The time history of height, velocity and acceleration produced by a run, with the impact time when there is one.
 _Avoid_: results, output, log
+
+### The animation extra
+
+**Terminal velocity**:
+The speed at which the drag force equals the weight force, so the net force is zero. It depends on the height when gravity varies.
+_Avoid_: limiting velocity, settling velocity
+
+**Energy lost to drag**:
+The energy that the drag force removes from the ball from the start of a run to the current time. It is minus the work that the drag force does, so it is never negative.
+_Avoid_: lost energy, dissipated energy, drag loss
+
+**Numerical error**:
+The start energy minus the sum of kinetic, potential and lost energy. It is zero for an exact integrator.
+_Avoid_: energy error, energy drift, residual

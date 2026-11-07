@@ -120,6 +120,47 @@ python -m ballsim.gui
 In the window, edit the parameters, load or save a preset, and press Run.
 Each run adds to the plots. Clear them with Clear plots, or untick Keep previous runs.
 
+## Optional animation (extras/)
+
+The animation replays one run. It shows:
+
+* The ball falling beside a height scale, with a blue drag arrow and a red weight arrow.
+* Three graphs (height, velocity, acceleration) that grow as time passes.
+* Gauges for drag, weight, speed and energy.
+* A text readout with the current values, such as terminal velocity, energy lost to drag and numerical error.
+
+Start it in one of two ways:
+
+```
+python -m extras.animate presets/tennis_ball.json
+```
+
+or press Animate in the GUI.
+
+Controls:
+
+* Pause and Resume, or press space. At the end of the run, Resume starts the run again.
+* Restart, or press r.
+* The speed slider has the steps x0.25, x0.5, x1, x2, x5, x10, x20, x50 and x100. The animation starts at the fastest step that still plays for about 10 s.
+* The time slider moves to any moment of the run.
+
+When the ball reaches the ground, a banner shows the impact time and velocity.
+
+Run the tests of the extra with:
+
+```
+pytest -q extras/tests
+```
+
+The extra adds a feature without changing the run loop, the data model or the core tests.
+The GUI imports it only when you press Animate.
+
+Module map of the extra:
+
+* `extras/quantities.py`: `Quantities`, `potential_energy` and `compute`. They find forces and energies for the animation from a trajectory. This file does not use matplotlib.
+* `extras/animate.py`: the `Animator` class, helpers such as `start_speed_index` and `format_readout`, and the command line entry `main`.
+* `extras/tests/`: the tests for both files. They use the Agg backend, so no window opens.
+
 ## Preset format
 
 A preset is a flat JSON file. The keys are the field names of `Parameters` in `ballsim/parameters.py`.
@@ -192,6 +233,7 @@ New input format:
 * Height-dependent fluid density.
 * Mach-dependent drag coefficient.
 * Property-based tests.
+* GIF or MP4 export of the animation.
 * A pip-installable package (build metadata in `pyproject.toml`).
 
 ## Limitations
