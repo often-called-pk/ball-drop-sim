@@ -4,10 +4,13 @@ from __future__ import annotations
 import dataclasses
 import math
 import textwrap
+import time
 
 import numpy as np
+from matplotlib.animation import FuncAnimation
 from matplotlib.figure import Figure
 from matplotlib.patches import FancyArrowPatch
+from matplotlib.widgets import Button, Slider
 
 from ballsim.parameters import Parameters
 from ballsim.simulation import Trajectory, describe, run
@@ -90,9 +93,18 @@ class Animator:
         )
         self.time_label = fig.text(0.5, 0.965, "", ha="center", fontsize=12)
         self.time = 0.0
+        self.last_tick = time.perf_counter()  # wall clock of the previous timer tick
         self.playing = True
         self.speed_index = start_speed_index(self.t_end)
+        self.syncing = False  # True while step() moves the scrubber, so on_scrub ignores it
+        self.build_controls()
+        self.set_banner(False)
         self.draw_frame(0.0)
+        # FuncAnimation is the timer: it calls step() FPS times a second once the canvas shows
+        self.animation = FuncAnimation(
+            fig, self.step, interval=1000 / FPS,
+            cache_frame_data=False,
+        )
 
     def build_ball_axis(self) -> None:
         """Make the tall left axis with ground, ball, force arrows and end banner."""
@@ -234,3 +246,89 @@ class Animator:
         """Show or hide the end-of-run summary on the ball axis."""
         self.banner.set_text(textwrap.fill(describe(self.trajectory), width=24))
         self.banner.set_visible(visible)
+
+    def build_controls(self) -> None:
+        """Add buttons and sliders in the bottom strip and keep references to them."""
+        fig = self.fig
+        self.pause_button = Button(fig.add_axes((0.07, 0.085, 0.08, 0.05)), "Pause")
+        self.restart_button = Button(fig.add_axes((0.16, 0.085, 0.08, 0.05)), "Restart")
+        self.speed_slider = Slider(
+            fig.add_axes((0.72, 0.085, 0.18, 0.05)), "Speed", 0, len(SPEED_STEPS) - 1,
+            valinit=self.speed_index, valstep=1,
+        )
+        self.speed_slider.valtext.set_text(f"x{SPEED_STEPS[self.speed_index]:g}")
+        self.scrubber = Slider(
+            fig.add_axes((0.15, 0.025, 0.75, 0.04)), "Time", 0, self.t_end, valinit=0.0,
+            valfmt="%.2f s",
+        )
+        self.pause_button.on_clicked(lambda event: self.toggle_pause())
+        self.restart_button.on_clicked(lambda event: self.restart())
+        self.speed_slider.on_changed(self.on_speed)
+        self.scrubber.on_changed(self.on_scrub)
+        fig.canvas.mpl_connect("key_press_event", self.on_key)
+
+    def step(self, frame: int) -> None:
+        """Timer tick: advance the clock, redraw and move the scrubber while playing."""
+        now = time.perf_counter()
+        elapsed = min(now - self.last_tick, 0.25)  # cap: a stall or a pause must not cause a jump
+        self.last_tick = now
+        if not self.playing:
+            return
+        # real elapsed time, not 1/FPS: a slow redraw would otherwise slow the playback
+        self.time = min(self.time + SPEED_STEPS[self.speed_index] * elapsed, self.t_end)
+        self.draw_frame(self.time)
+        self.syncing = True
+        self.scrubber.set_val(self.time)
+        self.syncing = False
+        if self.time >= self.t_end:
+            self.playing = False
+            self.banner.set_visible(True)
+            self.pause_button.label.set_text("Resume")
+
+    def toggle_pause(self) -> None:
+        """Pause or resume. Pressing it at the end of the run starts again."""
+        if self.time >= self.t_end:
+            self.restart()
+            return
+        self.playing = not self.playing
+        self.pause_button.label.set_text("Pause" if self.playing else "Resume")
+        self.fig.canvas.draw_idle()
+
+    def restart(self) -> None:
+        """Go back to t = 0 and play."""
+        self.time = 0.0
+        self.playing = True
+        self.banner.set_visible(False)
+        self.pause_button.label.set_text("Pause")
+        self.draw_frame(0.0)
+        self.syncing = True
+        self.scrubber.set_val(0.0)
+        self.syncing = False
+        self.fig.canvas.draw_idle()
+
+    def on_speed(self, val: float) -> None:
+        """Slider callback: pick a speed step and show it."""
+        self.speed_index = int(val)
+        self.speed_slider.valtext.set_text(f"x{SPEED_STEPS[self.speed_index]:g}")
+        self.update_time_label(self.time)
+        self.fig.canvas.draw_idle()
+
+    def on_scrub(self, val: float) -> None:
+        """Slider callback: jump to the chosen time (ignored when step() moved it)."""
+        if self.syncing:
+            return
+        self.time = float(val)
+        self.banner.set_visible(self.time >= self.t_end)
+        self.draw_frame(self.time)
+        self.fig.canvas.draw_idle()
+
+    def on_key(self, event) -> None:
+        """Space pauses or resumes, r restarts."""
+        if event.key == " ":
+            self.toggle_pause()
+        elif event.key == "r":
+            self.restart()
+
+    def stop(self) -> None:
+        """Stop the timer before the window is reused or closed."""
+        self.animation.event_source.stop()
