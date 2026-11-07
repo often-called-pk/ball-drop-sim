@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import time
+from pathlib import Path
 
 import matplotlib
 
@@ -16,9 +17,11 @@ from ballsim.simulation import run
 from extras.animate import FPS, Animator, format_readout, main, start_speed_index, values_at
 from extras.quantities import compute
 
+PRESETS = Path(__file__).resolve().parents[2] / "presets"
+
 
 def tennis(**kw):
-    return replace(load_preset("presets/tennis_ball.json"), integrator="rk4", **kw)
+    return replace(load_preset(PRESETS / "tennis_ball.json"), integrator="rk4", **kw)
 
 
 def make_animator(params):
@@ -63,7 +66,7 @@ def test_draw_frame_moves_ball_graphs_and_readout():
 
 
 def test_satellite_builds_and_draws_last_frame():
-    animator = make_animator(load_preset("presets/satellite_reentry.json"))
+    animator = make_animator(load_preset(PRESETS / "satellite_reentry.json"))
     animator.draw_frame(animator.trajectory.t[-1])
     animator.draw_frame(0.0)
 
@@ -83,11 +86,71 @@ class FakeKey:
 def test_step_advances_time_by_speed_times_elapsed():
     animator = make_animator(tennis())
     animator.on_speed(5)  # x10
+    animator.step(0)  # first tick only starts the clock
     before = animator.time
     for _ in range(3):
         animator.last_tick = time.perf_counter() - 0.1
         animator.step(0)
     assert animator.time - before == pytest.approx(3 * 10 * 0.1, rel=0.05)
+
+
+def test_first_step_does_not_advance_time():
+    animator = make_animator(tennis())
+    animator.on_speed(5)
+    animator.time = 0.0
+    animator.last_tick = None  # as at construction and after any resume
+    animator.step(0)
+    assert animator.time == 0.0
+
+
+def test_resume_clears_last_tick():
+    animator = make_animator(tennis())
+    animator.toggle_pause()
+    animator.toggle_pause()
+    assert animator.last_tick is None
+
+
+def test_pause_and_end_pause_the_animation():
+    animator = make_animator(tennis())
+    calls = []
+    animator.animation.pause = lambda: calls.append("pause")
+    animator.animation.resume = lambda: calls.append("resume")
+    animator.toggle_pause()
+    animator.toggle_pause()
+    animator.time = animator.t_end - 1e-9
+    animator.last_tick = time.perf_counter() - 0.1
+    animator.step(0)
+    animator.restart()
+    assert calls == ["pause", "resume", "pause", "resume"]
+
+
+def test_scrub_while_paused_still_redraws():
+    animator = make_animator(tennis())
+    animator.toggle_pause()
+    animator.scrubber.set_val(5.0)
+    assert "5.00" in animator.readout.get_text()
+
+
+def test_satellite_has_no_terminal_line_tennis_has_one():
+    sat = make_animator(load_preset(PRESETS / "satellite_reentry.json"))
+    ten = make_animator(tennis())
+    assert len(sat.graph_lines[1].axes.lines) == 2  # line and dot only
+    assert len(ten.graph_lines[1].axes.lines) == 3
+
+
+def test_ground_band_leaves_room_for_weight_arrow_at_impact():
+    animator = make_animator(tennis())
+    assert animator.ball_ax.get_ylim()[0] < 0
+    animator.draw_frame(animator.t_end)
+    tip_y = animator.weight_arrow._posA_posB[1][1]
+    assert tip_y >= animator.ball_ax.get_ylim()[0]
+
+
+@pytest.mark.filterwarnings("error::RuntimeWarning")
+def test_zero_gravity_builds_and_draws():
+    animator = make_animator(tennis(g=0.0, initial_velocity=-5.0))
+    animator.draw_frame(animator.t_end)
+    animator.fig.canvas.draw()
 
 
 def test_scrubber_sets_time_and_pause_holds_it():
@@ -151,5 +214,5 @@ def test_keys_toggle_and_restart():
 
 def test_main_missing_file_exits_with_message():
     with pytest.raises(SystemExit) as info:
-        main(["presets/does_not_exist.json"])
+        main([str(PRESETS / "does_not_exist.json")])
     assert "animate" in str(info.value)

@@ -1,5 +1,6 @@
 import math
 from dataclasses import replace
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -9,13 +10,15 @@ from ballsim.presets import load_preset
 from ballsim.simulation import make_forces, run
 from extras.quantities import compute, potential_energy
 
+PRESETS = Path(__file__).resolve().parents[2] / "presets"
+
 
 def tennis(**kw):
-    return replace(load_preset("presets/tennis_ball.json"), integrator="rk4", **kw)
+    return replace(load_preset(PRESETS / "tennis_ball.json"), integrator="rk4", **kw)
 
 
 def satellite():
-    return load_preset("presets/satellite_reentry.json")
+    return load_preset(PRESETS / "satellite_reentry.json")
 
 
 @pytest.mark.parametrize("params", [tennis(), satellite()])

@@ -99,5 +99,5 @@ The energy that the drag force removes from the ball from the start of a run to 
 _Avoid_: lost energy, dissipated energy, drag loss
 
 **Numerical error**:
-The start energy minus the sum of kinetic, potential and lost energy. It is zero for an exact integrator.
+The start energy minus the sum of kinetic, potential and energy lost to drag. It is zero for an exact integrator.
 _Avoid_: energy error, energy drift, residual

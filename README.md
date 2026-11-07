@@ -141,10 +141,10 @@ Controls:
 
 * Pause and Resume, or press space. At the end of the run, Resume starts the run again.
 * Restart, or press r.
-* The speed slider has the steps x0.25, x0.5, x1, x2, x5, x10, x20, x50 and x100. The animation starts at the fastest step that still plays for about 10 s.
+* The speed slider has the steps x0.25, x0.5, x1, x2, x5, x10, x20, x50 and x100. The animation starts at the fastest step that keeps playback at or above 10 s. The shipped presets play for about 15 s.
 * The time slider moves to any moment of the run.
 
-When the ball reaches the ground, a banner shows the impact time and velocity.
+When the run ends, a banner shows the result. If the ball reaches the ground, it shows the impact time and velocity. If the run ends at the finish time without impact, it shows the height.
 
 Run the tests of the extra with:
 
@@ -159,7 +159,7 @@ Module map of the extra:
 
 * `extras/quantities.py`: `Quantities`, `potential_energy` and `compute`. They find forces and energies for the animation from a trajectory. This file does not use matplotlib.
 * `extras/animate.py`: the `Animator` class, helpers such as `start_speed_index` and `format_readout`, and the command line entry `main`.
-* `extras/tests/`: the tests for both files. They use the Agg backend, so no window opens.
+* `extras/tests/`: the tests for both files. Only the animation tests use the Agg backend, so no window opens.
 
 ## Preset format
 

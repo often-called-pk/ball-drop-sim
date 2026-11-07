@@ -9,6 +9,7 @@ import time
 
 import numpy as np
 from matplotlib.animation import FuncAnimation
+from matplotlib.backend_bases import KeyEvent
 from matplotlib.figure import Figure
 from matplotlib.patches import FancyArrowPatch
 from matplotlib.widgets import Button, Slider
@@ -95,7 +96,7 @@ class Animator:
         )
         self.time_label = fig.text(0.5, 0.965, "", ha="center", fontsize=12)
         self.time = 0.0
-        self.last_tick = time.perf_counter()  # wall clock of the previous timer tick
+        self.last_tick: float | None = None  # wall clock of the previous tick, None = restart the clock
         self.playing = True
         self.speed_index = start_speed_index(self.t_end)
         self.syncing = False  # True while step() moves the scrubber, so on_scrub ignores it
@@ -103,14 +104,15 @@ class Animator:
         self.set_banner(False)
         self.draw_frame(0.0)
         # FuncAnimation is the timer: it calls step() FPS times a second once the canvas shows
+        # init_func stops the first draw_event calling step(), which would use up the clock start
         self.animation = FuncAnimation(
-            fig, self.step, interval=1000 / FPS,
+            fig, self.step, init_func=lambda: [], interval=1000 / FPS,
             cache_frame_data=False,
         )
 
     def build_ball_axis(self) -> None:
         """Make the tall left axis with ground, ball, force arrows and end banner."""
-        # bottom margin 0.15 leaves a strip for the controls
+        # bottom margin 0.17 leaves a strip for the controls
         grid = self.fig.add_gridspec(
             3, 3, width_ratios=[1, 2.2, 1.6], left=0.07, right=0.97, bottom=0.17, top=0.93,
             wspace=0.3, hspace=0.35,
@@ -120,12 +122,18 @@ class Animator:
         self.ball_ax = ax
         self.top = float(np.max(self.trajectory.x)) * 1.05
         ax.set_xlim(-1, 1)
-        ax.set_ylim(0, self.top)
+        ax.set_ylim(-0.2 * self.top, self.top)  # the band below 0 is the ground
         ax.set_xticks([])
+        ax.set_yticks([t for t in ax.get_yticks() if t >= 0])  # no tick labels inside the ground band
+        ax.set_ylim(-0.2 * self.top, self.top)
         ax.set_ylabel("Height [m]")
+        ax.axhspan(-0.2 * self.top, 0, color="0.85")
         ax.axhline(0, color="black", linewidth=2)
+        ax.text(0.55, -0.1 * self.top, "ground", ha="center", va="center", fontsize=8)
         self.ball = ax.plot([0], [self.trajectory.x[0]], "o", markersize=14, color="tab:green")[0]
-        self.n_per_m = abs(self.quantities.weight[0]) / (0.15 * self.top)  # N per metre of arrow
+        # zero weight (g = 0) would divide by zero, so fall back to the largest drag, then to 1 N
+        reference = abs(self.quantities.weight[0]) or float(np.max(np.abs(self.quantities.drag))) or 1.0
+        self.n_per_m = reference / (0.15 * self.top)  # N per metre of arrow
         self.drag_arrow = self.make_arrow("tab:blue")
         self.weight_arrow = self.make_arrow("tab:red")
         ax.text(-0.95, self.top * 0.97, "drag (up)", color="tab:blue", fontsize=9, va="top")
@@ -147,7 +155,7 @@ class Animator:
         """Make three stacked graphs sharing the time axis, with fixed full-run limits."""
         traj, q = self.trajectory, self.quantities
         has_terminal = not np.all(np.isnan(q.terminal_speed))  # no drag gives all nan
-        velocity_limits = [traj.v]  # terminal line is clipped when off scale
+        velocity_limits = [traj.v]
         specs = [
             ("Height [m]", traj.x, [traj.x]),
             ("Velocity [m/s]", traj.v, velocity_limits),
@@ -168,8 +176,9 @@ class Animator:
             if row < 2:
                 ax.tick_params(labelbottom=False)
         ax.set_xlabel("Time [s]")
-        if has_terminal:
-            vel_ax = self.graph_lines[1].axes
+        vel_ax = self.graph_lines[1].axes
+        # skip the terminal line when it lies off the velocity scale, the readout still shows it
+        if has_terminal and np.nanmin(-q.terminal_speed) >= vel_ax.get_ylim()[0]:
             vel_ax.plot(traj.t, -q.terminal_speed, "--", color="gray", label="terminal velocity")
             vel_ax.legend(loc="center right", fontsize=8)
 
@@ -271,11 +280,14 @@ class Animator:
 
     def step(self, frame: int) -> None:
         """Timer tick: advance the clock, redraw and move the scrubber while playing."""
-        now = time.perf_counter()
-        elapsed = min(now - self.last_tick, 0.25)  # cap: a stall or a pause must not cause a jump
-        self.last_tick = now
         if not self.playing:
             return
+        now = time.perf_counter()
+        if self.last_tick is None:  # first tick after a start or resume only starts the clock
+            self.last_tick = now
+            return
+        elapsed = min(now - self.last_tick, 0.25)  # cap: a stall must not cause a jump
+        self.last_tick = now
         # real elapsed time, not 1/FPS: a slow redraw would otherwise slow the playback
         self.time = min(self.time + SPEED_STEPS[self.speed_index] * elapsed, self.t_end)
         self.draw_frame(self.time)
@@ -283,30 +295,31 @@ class Animator:
         self.scrubber.set_val(self.time)
         self.syncing = False
         if self.time >= self.t_end:
-            self.playing = False
             self.banner.set_visible(True)
-            self.pause_button.label.set_text("Resume")
+            self.set_playing(False)
+
+    def set_playing(self, playing: bool) -> None:
+        """Start or stop playback; a stopped timer saves CPU and a new start resets the clock."""
+        self.playing = playing
+        self.last_tick = None
+        self.pause_button.label.set_text("Pause" if playing else "Resume")
+        if playing:
+            self.animation.resume()
+        else:
+            self.animation.pause()
+        self.fig.canvas.draw_idle()
 
     def toggle_pause(self) -> None:
         """Pause or resume. Pressing it at the end of the run starts again."""
         if self.time >= self.t_end:
             self.restart()
             return
-        self.playing = not self.playing
-        self.pause_button.label.set_text("Pause" if self.playing else "Resume")
-        self.fig.canvas.draw_idle()
+        self.set_playing(not self.playing)
 
     def restart(self) -> None:
         """Go back to t = 0 and play."""
-        self.time = 0.0
-        self.playing = True
-        self.banner.set_visible(False)
-        self.pause_button.label.set_text("Pause")
-        self.draw_frame(0.0)
-        self.syncing = True
-        self.scrubber.set_val(0.0)
-        self.syncing = False
-        self.fig.canvas.draw_idle()
+        self.set_playing(True)
+        self.scrubber.set_val(0.0)  # on_scrub does the rest: time, banner and redraw
 
     def on_speed(self, val: float) -> None:
         """Slider callback: pick a speed step and show it."""
@@ -324,7 +337,7 @@ class Animator:
         self.draw_frame(self.time)
         self.fig.canvas.draw_idle()
 
-    def on_key(self, event) -> None:
+    def on_key(self, event: KeyEvent) -> None:
         """Space pauses or resumes, r restarts."""
         if event.key == " ":
             self.toggle_pause()
@@ -347,7 +360,8 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(f"animate: {error}")
     import matplotlib.pyplot as plt  # only the CLI needs pyplot, the Animator does not
 
-    plt.rcParams["keymap.home"].remove("r")  # r restarts the animation
+    if "r" in plt.rcParams["keymap.home"]:
+        plt.rcParams["keymap.home"].remove("r")  # r restarts the animation
     fig = plt.figure(figsize=(13, 8))
     animator = Animator(fig, params)  # keep a reference or the timer and widgets die
     plt.show()
