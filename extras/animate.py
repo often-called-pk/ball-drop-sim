@@ -1,0 +1,236 @@
+"""Animation of one run: a falling ball with live graphs, gauges and numbers."""
+from __future__ import annotations
+
+import dataclasses
+import math
+import textwrap
+
+import numpy as np
+from matplotlib.figure import Figure
+from matplotlib.patches import FancyArrowPatch
+
+from ballsim.parameters import Parameters
+from ballsim.simulation import Trajectory, describe, run
+from extras.quantities import Quantities, compute
+
+SPEED_STEPS = (0.25, 0.5, 1, 2, 5, 10, 20, 50, 100)
+FPS = 30
+TARGET_PLAYBACK = 10.0  # s, how long a run should take to play at the start speed
+
+
+def start_speed_index(duration: float) -> int:
+    """Pick the fastest speed that still plays the run for about TARGET_PLAYBACK s."""
+    best = 0
+    for i, step in enumerate(SPEED_STEPS):
+        if duration / step >= TARGET_PLAYBACK:
+            best = i
+    return best
+
+
+def values_at(trajectory: Trajectory, quantities: Quantities, t: float) -> dict[str, float]:
+    """Interpolate every displayed value at time t so frames between samples are smooth."""
+    arrays = {"x": trajectory.x, "v": trajectory.v, "a": trajectory.a}
+    for field in dataclasses.fields(quantities):
+        arrays[field.name] = getattr(quantities, field.name)
+    values = {name: float(np.interp(t, trajectory.t, y)) for name, y in arrays.items()}
+    values["t"] = float(t)
+    return values
+
+
+def format_readout(values: dict[str, float]) -> str:
+    """Lay the numbers out as aligned monospace lines with units."""
+    v = values
+    terminal = v["terminal_speed"]
+    if math.isnan(terminal):
+        terminal_text, ratio_text = "none (no drag)", "none"
+    else:
+        terminal_text = f"{terminal:10.4g} m/s"
+        ratio_text = f"{abs(v['drag']) / abs(v['weight']):10.4g}" if v["weight"] else "none"
+    lines = [
+        f"t  {v['t']:8.2f} s",
+        f"height        {v['x']:10.4g} m",
+        f"velocity      {v['v']:10.4g} m/s",
+        f"acceleration  {v['a']:10.4g} m/s^2",
+        f"drag          {v['drag']:10.4g} N",
+        f"weight        {v['weight']:10.4g} N",
+        f"net           {v['net']:10.4g} N",
+        f"terminal vel. {terminal_text}",
+        f"drag/weight   {ratio_text}",
+        f"kinetic       {v['kinetic']:10.4g} J",
+        f"potential     {v['potential']:10.4g} J",
+        f"lost to drag  {v['lost']:10.4g} J",
+        f"numeric error {v['error']:10.4g} J",
+    ]
+    return "\n".join(lines)
+
+
+def padded_limits(*arrays: np.ndarray) -> tuple[float, float]:
+    """Axis limits for the whole run with a 5% margin, never zero height."""
+    lo = min(float(np.nanmin(a)) for a in arrays)
+    hi = max(float(np.nanmax(a)) for a in arrays)
+    pad = 0.05 * (hi - lo) if hi > lo else 1.0
+    return lo - pad, hi + pad
+
+
+class Animator:
+    """Owns the figure of one animated run and redraws it for any time t."""
+
+    def __init__(self, fig: Figure, params: Parameters) -> None:
+        self.fig = fig
+        self.params = params
+        self.trajectory = run(params)
+        self.quantities = compute(params, self.trajectory)
+        self.t_end = float(self.trajectory.t[-1])
+        self.build_ball_axis()
+        self.build_graphs()
+        self.build_gauges()
+        self.readout = self.readout_ax.text(
+            0.0, 1.0, "", family="monospace", fontsize=9, va="top",
+            transform=self.readout_ax.transAxes,
+        )
+        self.time_label = fig.text(0.5, 0.965, "", ha="center", fontsize=12)
+        self.time = 0.0
+        self.playing = True
+        self.speed_index = start_speed_index(self.t_end)
+        self.draw_frame(0.0)
+
+    def build_ball_axis(self) -> None:
+        """Make the tall left axis with ground, ball, force arrows and end banner."""
+        # bottom margin 0.15 leaves a strip for the controls
+        grid = self.fig.add_gridspec(
+            3, 3, width_ratios=[1, 2.2, 1.6], left=0.07, right=0.97, bottom=0.17, top=0.93,
+            wspace=0.3, hspace=0.35,
+        )
+        self.grid = grid
+        ax = self.fig.add_subplot(grid[:, 0])
+        self.ball_ax = ax
+        self.top = float(np.max(self.trajectory.x)) * 1.05
+        ax.set_xlim(-1, 1)
+        ax.set_ylim(0, self.top)
+        ax.set_xticks([])
+        ax.set_ylabel("Height [m]")
+        ax.axhline(0, color="black", linewidth=2)
+        self.ball = ax.plot([0], [self.trajectory.x[0]], "o", markersize=14, color="tab:green")[0]
+        self.n_per_m = abs(self.quantities.weight[0]) / (0.15 * self.top)  # N per metre of arrow
+        self.drag_arrow = self.make_arrow("tab:blue")
+        self.weight_arrow = self.make_arrow("tab:red")
+        ax.text(-0.95, self.top * 0.97, "drag (up)", color="tab:blue", fontsize=9, va="top")
+        ax.text(-0.95, self.top * 0.93, "weight (down)", color="tab:red", fontsize=9, va="top")
+        self.banner = ax.text(
+            0.0, self.top * 0.5, "", ha="center", va="center", fontsize=9, visible=False,
+            bbox={"boxstyle": "round", "facecolor": "white", "edgecolor": "gray"},
+        )
+
+    def make_arrow(self, color: str) -> FancyArrowPatch:
+        """Add one force arrow to the ball axis, positioned later by draw_frame."""
+        arrow = FancyArrowPatch(
+            (0, 0), (0, 0), arrowstyle="-|>", mutation_scale=15, color=color, linewidth=2
+        )
+        self.ball_ax.add_patch(arrow)
+        return arrow
+
+    def build_graphs(self) -> None:
+        """Make three stacked graphs sharing the time axis, with fixed full-run limits."""
+        traj, q = self.trajectory, self.quantities
+        has_terminal = not np.all(np.isnan(q.terminal_speed))  # no drag gives all nan
+        velocity_limits = [traj.v]  # terminal line is clipped when off scale
+        specs = [
+            ("Height [m]", traj.x, [traj.x]),
+            ("Velocity [m/s]", traj.v, velocity_limits),
+            ("Acceleration [m/s^2]", traj.a, [traj.a]),
+        ]
+        self.graph_data = [data for _, data, _ in specs]
+        self.graph_lines, self.graph_dots = [], []
+        first = None
+        for row, (label, data, limit_arrays) in enumerate(specs):
+            ax = self.fig.add_subplot(self.grid[row, 1], sharex=first)
+            first = first or ax
+            ax.set_xlim(0, self.t_end)
+            ax.set_ylim(*padded_limits(*limit_arrays))
+            ax.set_ylabel(label)
+            ax.grid(alpha=0.3)
+            self.graph_lines.append(ax.plot([], [], color="tab:blue")[0])
+            self.graph_dots.append(ax.plot([], [], "o", color="tab:red")[0])
+            if row < 2:
+                ax.tick_params(labelbottom=False)
+        ax.set_xlabel("Time [s]")
+        if has_terminal:
+            vel_ax = self.graph_lines[1].axes
+            vel_ax.plot(traj.t, -q.terminal_speed, "--", color="gray", label="terminal velocity")
+            vel_ax.legend(loc="center right", fontsize=8)
+
+    def build_gauges(self) -> None:
+        """Make the bar gauges and the readout axis on the right."""
+        q, traj = self.quantities, self.trajectory
+        self.gauge_ax = self.fig.add_subplot(self.grid[0, 2])
+        self.readout_ax = self.fig.add_subplot(self.grid[1:, 2])
+        self.readout_ax.axis("off")
+        total = q.kinetic + q.potential + q.lost
+        self.gauge_max = {
+            "drag": float(np.max(np.abs(q.drag))),
+            "weight": float(np.max(np.abs(q.weight))),
+            "speed": float(np.max(np.abs(traj.v))),
+            "energy": float(np.max(total)),
+        }
+        ax = self.gauge_ax
+        ax.set_xlim(0, 1)
+        ax.set_ylim(-1.3, 3.6)  # empty band under the energy row holds the legend
+        ax.set_yticks([3, 2, 1, 0], ["drag", "weight", "speed", "energy"])
+        ax.set_xlabel("share of run maximum")
+        self.gauge_rects = {}
+        for name, row, color in [
+            ("drag", 3, "tab:blue"), ("weight", 2, "tab:red"), ("speed", 1, "tab:green"),
+            ("kinetic", 0, "tab:orange"), ("potential", 0, "tab:purple"), ("lost", 0, "gray"),
+        ]:
+            label = name if row == 0 else None
+            self.gauge_rects[name] = ax.barh(row, 0.0, height=0.6, color=color, label=label)[0]
+        ax.legend(loc="lower right", fontsize=7, ncol=3)
+
+    def set_gauges(self, v: dict[str, float]) -> None:
+        """Resize the gauge bars; the energy row stacks kinetic, potential and lost."""
+        m = self.gauge_max
+        widths = {
+            "drag": abs(v["drag"]) / m["drag"] if m["drag"] > 0 else 0.0,
+            "weight": abs(v["weight"]) / m["weight"] if m["weight"] > 0 else 0.0,
+            "speed": abs(v["v"]) / m["speed"] if m["speed"] > 0 else 0.0,
+        }
+        for name in ("kinetic", "potential", "lost"):
+            widths[name] = v[name] / m["energy"] if m["energy"] > 0 else 0.0
+        left = 0.0
+        for name in ("kinetic", "potential", "lost"):
+            self.gauge_rects[name].set_x(left)
+            left += max(widths[name], 0.0)
+        for name, width in widths.items():
+            self.gauge_rects[name].set_width(max(width, 0.0))
+
+    def set_graphs(self, t: float, v: dict[str, float]) -> None:
+        """Grow each line up to t and move its dot to the interpolated value."""
+        traj = self.trajectory
+        n = int(np.searchsorted(traj.t, t, side="right"))
+        keys = ("x", "v", "a")
+        for line, dot, data, key in zip(self.graph_lines, self.graph_dots, self.graph_data, keys):
+            line.set_data(np.append(traj.t[:n], t), np.append(data[:n], v[key]))
+            dot.set_data([t], [v[key]])
+
+    def draw_frame(self, t: float) -> None:
+        """Update every artist for time t. The caller redraws the canvas."""
+        v = values_at(self.trajectory, self.quantities, t)
+        x = v["x"]
+        self.ball.set_data([0], [x])
+        for arrow, force in ((self.drag_arrow, v["drag"]), (self.weight_arrow, v["weight"])):
+            arrow.set_positions((0, x), (0, x + force / self.n_per_m))
+        self.set_graphs(t, v)
+        self.set_gauges(v)
+        self.readout.set_text(format_readout(v))
+        self.update_time_label(t)
+
+    def update_time_label(self, t: float) -> None:
+        """Show current time and playback speed above the plots."""
+        self.time_label.set_text(
+            f"t = {t:.2f} s   speed x{SPEED_STEPS[self.speed_index]:g}"
+        )
+
+    def set_banner(self, visible: bool) -> None:
+        """Show or hide the end-of-run summary on the ball axis."""
+        self.banner.set_text(textwrap.fill(describe(self.trajectory), width=24))
+        self.banner.set_visible(visible)
