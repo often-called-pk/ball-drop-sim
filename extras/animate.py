@@ -1,6 +1,7 @@
 """Animation of one run: a falling ball with live graphs, gauges and numbers."""
 from __future__ import annotations
 
+import argparse
 import dataclasses
 import math
 import textwrap
@@ -13,6 +14,7 @@ from matplotlib.patches import FancyArrowPatch
 from matplotlib.widgets import Button, Slider
 
 from ballsim.parameters import Parameters
+from ballsim.presets import load_preset
 from ballsim.simulation import Trajectory, describe, run
 from extras.quantities import Quantities, compute
 
@@ -332,3 +334,24 @@ class Animator:
     def stop(self) -> None:
         """Stop the timer before the window is reused or closed."""
         self.animation.event_source.stop()
+
+
+def main(argv: list[str] | None = None) -> None:
+    """Open the animation window for one preset file."""
+    parser = argparse.ArgumentParser(prog="extras.animate", description="Animate one run.")
+    parser.add_argument("preset", help="preset JSON file to animate")
+    args = parser.parse_args(argv)
+    try:
+        params = load_preset(args.preset)
+    except (OSError, ValueError) as error:
+        raise SystemExit(f"animate: {error}")
+    import matplotlib.pyplot as plt  # only the CLI needs pyplot, the Animator does not
+
+    plt.rcParams["keymap.home"].remove("r")  # r restarts the animation
+    fig = plt.figure(figsize=(13, 8))
+    animator = Animator(fig, params)  # keep a reference or the timer and widgets die
+    plt.show()
+
+
+if __name__ == "__main__":
+    main()

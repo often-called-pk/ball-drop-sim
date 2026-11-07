@@ -13,7 +13,7 @@ from matplotlib.figure import Figure
 
 from ballsim.presets import load_preset
 from ballsim.simulation import run
-from extras.animate import FPS, Animator, format_readout, start_speed_index, values_at
+from extras.animate import FPS, Animator, format_readout, main, start_speed_index, values_at
 from extras.quantities import compute
 
 
@@ -147,3 +147,9 @@ def test_keys_toggle_and_restart():
     animator.time = 4.0
     animator.on_key(FakeKey("r"))
     assert animator.time == 0.0 and animator.playing is True
+
+
+def test_main_missing_file_exits_with_message():
+    with pytest.raises(SystemExit) as info:
+        main(["presets/does_not_exist.json"])
+    assert "animate" in str(info.value)
