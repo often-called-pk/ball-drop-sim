@@ -1,0 +1,17 @@
+{
+  "name": "tennis ball",
+  "mass": 0.057,
+  "radius": 0.0335,
+  "drag_coefficient": 0.5,
+  "fluid_density": 1.225,
+  "gravity_model": "constant",
+  "g": 9.81,
+  "G": 6.674e-11,
+  "M": 5.972e+24,
+  "R": 6371000.0,
+  "initial_height": 100.0,
+  "initial_velocity": 0.0,
+  "finish_time": 10.0,
+  "time_step": 0.01,
+  "integrator": "simple"
+}

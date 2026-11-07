@@ -1,0 +1,17 @@
+{
+  "name": "satellite re-entry",
+  "mass": 500.0,
+  "radius": 1.0,
+  "drag_coefficient": 1.0,
+  "fluid_density": 1e-05,
+  "gravity_model": "newtonian",
+  "g": 9.81,
+  "G": 6.674e-11,
+  "M": 5.972e+24,
+  "R": 6371000.0,
+  "initial_height": 100000.0,
+  "initial_velocity": 0.0,
+  "finish_time": 300.0,
+  "time_step": 0.1,
+  "integrator": "simple"
+}
