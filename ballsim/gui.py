@@ -32,7 +32,6 @@ class App:
         self.canvas: FigureCanvasTkAgg | None = None
         self.axes: list[Axes] = []
         self.anim_window: tk.Toplevel | None = None
-        self.anim_fig: Figure | None = None
         self.anim_canvas: FigureCanvasTkAgg | None = None
         self.animator = None
 
@@ -119,7 +118,6 @@ class App:
         if self.window is None or not self.window.winfo_exists():
             self.window = tk.Toplevel(self.root)
             self.window.title("Trajectories")
-            self.window.protocol("WM_DELETE_WINDOW", self.window.destroy)
             self.fig = Figure(figsize=(7, 7))
             self.canvas = FigureCanvasTkAgg(self.fig, master=self.window)
             NavigationToolbar2Tk(self.canvas, self.window)
@@ -160,10 +158,10 @@ class App:
             self.animator.stop()
             # the old canvas still holds the old animator's mouse and key handlers
             self.anim_canvas.get_tk_widget().destroy()
-        self.anim_fig = Figure(figsize=(13, 8))
-        self.anim_canvas = FigureCanvasTkAgg(self.anim_fig, master=self.anim_window)
+        fig = Figure(figsize=(13, 8))
+        self.anim_canvas = FigureCanvasTkAgg(fig, master=self.anim_window)
         self.anim_canvas.get_tk_widget().pack(fill="both", expand=True)
-        self.animator = animation.Animator(self.anim_fig, params)
+        self.animator = animation.Animator(fig, params)
         self.anim_canvas.draw()
         self.anim_canvas.get_tk_widget().focus_set()  # key presses need focus
         self.status.set(f"Animating {params.name}")
@@ -182,9 +180,6 @@ class App:
 
 def main() -> None:
     root = tk.Tk()
-    app = App(root)
+    App(root)
     root.mainloop()
 
-
-if __name__ == "__main__":
-    main()

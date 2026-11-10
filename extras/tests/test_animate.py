@@ -14,7 +14,7 @@ from matplotlib.figure import Figure
 
 from ballsim.presets import load_preset
 from ballsim.simulation import run
-from extras.animate import FPS, Animator, format_readout, main, start_speed_index, values_at
+from extras.animate import Animator, format_readout, main, start_speed_index, values_at
 from extras.quantities import compute
 
 PRESETS = Path(__file__).resolve().parents[2] / "presets"

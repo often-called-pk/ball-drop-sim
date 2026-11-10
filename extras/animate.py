@@ -70,10 +70,9 @@ def format_readout(values: dict[str, float]) -> str:
     return "\n".join(lines)
 
 
-def padded_limits(*arrays: np.ndarray) -> tuple[float, float]:
+def padded_limits(data: np.ndarray) -> tuple[float, float]:
     """Axis limits for the whole run with a 5% margin, never zero height."""
-    lo = min(float(np.nanmin(a)) for a in arrays)
-    hi = max(float(np.nanmax(a)) for a in arrays)
+    lo, hi = float(np.nanmin(data)), float(np.nanmax(data))
     pad = 0.05 * (hi - lo) if hi > lo else 1.0
     return lo - pad, hi + pad
 
@@ -83,7 +82,6 @@ class Animator:
 
     def __init__(self, fig: Figure, params: Parameters) -> None:
         self.fig = fig
-        self.params = params
         self.trajectory = run(params)
         self.quantities = compute(params, self.trajectory)
         self.t_end = float(self.trajectory.t[-1])
@@ -155,20 +153,18 @@ class Animator:
         """Make three stacked graphs sharing the time axis, with fixed full-run limits."""
         traj, q = self.trajectory, self.quantities
         has_terminal = not np.all(np.isnan(q.terminal_speed))  # no drag gives all nan
-        velocity_limits = [traj.v]
         specs = [
-            ("Height [m]", traj.x, [traj.x]),
-            ("Velocity [m/s]", traj.v, velocity_limits),
-            ("Acceleration [m/s^2]", traj.a, [traj.a]),
+            ("Height [m]", traj.x),
+            ("Velocity [m/s]", traj.v),
+            ("Acceleration [m/s^2]", traj.a),
         ]
-        self.graph_data = [data for _, data, _ in specs]
         self.graph_lines, self.graph_dots = [], []
         first = None
-        for row, (label, data, limit_arrays) in enumerate(specs):
+        for row, (label, data) in enumerate(specs):
             ax = self.fig.add_subplot(self.grid[row, 1], sharex=first)
             first = first or ax
             ax.set_xlim(0, self.t_end)
-            ax.set_ylim(*padded_limits(*limit_arrays))
+            ax.set_ylim(*padded_limits(data))
             ax.set_ylabel(label)
             ax.grid(alpha=0.3)
             self.graph_lines.append(ax.plot([], [], color="tab:blue")[0])
@@ -185,7 +181,7 @@ class Animator:
     def build_gauges(self) -> None:
         """Make the bar gauges and the readout axis on the right."""
         q, traj = self.quantities, self.trajectory
-        self.gauge_ax = self.fig.add_subplot(self.grid[0, 2])
+        ax = self.fig.add_subplot(self.grid[0, 2])
         self.readout_ax = self.fig.add_subplot(self.grid[1:, 2])
         self.readout_ax.axis("off")
         total = q.kinetic + q.potential + q.lost
@@ -195,7 +191,6 @@ class Animator:
             "speed": float(np.max(np.abs(traj.v))),
             "energy": float(np.max(total)),
         }
-        ax = self.gauge_ax
         ax.set_xlim(0, 1)
         ax.set_ylim(-1.3, 3.6)  # empty band under the energy row holds the legend
         ax.set_yticks([3, 2, 1, 0], ["drag", "weight", "speed", "energy"])
@@ -231,7 +226,8 @@ class Animator:
         traj = self.trajectory
         n = int(np.searchsorted(traj.t, t, side="right"))
         keys = ("x", "v", "a")
-        for line, dot, data, key in zip(self.graph_lines, self.graph_dots, self.graph_data, keys):
+        series = (traj.x, traj.v, traj.a)
+        for line, dot, data, key in zip(self.graph_lines, self.graph_dots, series, keys):
             line.set_data(np.append(traj.t[:n], t), np.append(data[:n], v[key]))
             dot.set_data([t], [v[key]])
 
