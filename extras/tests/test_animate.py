@@ -14,7 +14,7 @@ from matplotlib.figure import Figure
 
 from ballsim.presets import load_preset
 from ballsim.simulation import run
-from extras.animate import Animator, format_readout, main, start_speed_index, values_at
+from extras.animate import TARGET_PLAYBACK, Animator, format_readout, main, values_at
 from extras.quantities import compute
 
 PRESETS = Path(__file__).resolve().parents[2] / "presets"
@@ -30,11 +30,6 @@ def make_animator(params):
     animator = Animator(fig, params)
     fig.canvas.draw()
     return animator
-
-
-@pytest.mark.parametrize("duration, index", [(7.348, 1), (144.7, 5), (2824, 8), (1.0, 0)])
-def test_start_speed_index(duration, index):
-    assert start_speed_index(duration) == index
 
 
 def test_values_at_zero_is_first_sample():
@@ -78,25 +73,19 @@ def test_no_drag_builds_without_warnings():
     animator.fig.canvas.draw()
 
 
-class FakeKey:
-    def __init__(self, key):
-        self.key = key
-
-
-def test_step_advances_time_by_speed_times_elapsed():
+def test_step_advances_time_at_fixed_playback_rate():
     animator = make_animator(tennis())
-    animator.on_speed(5)  # x10
     animator.step(0)  # first tick only starts the clock
     before = animator.time
     for _ in range(3):
         animator.last_tick = time.perf_counter() - 0.1
         animator.step(0)
-    assert animator.time - before == pytest.approx(3 * 10 * 0.1, rel=0.05)
+    rate = animator.t_end / TARGET_PLAYBACK
+    assert animator.time - before == pytest.approx(3 * rate * 0.1, rel=0.05)
 
 
 def test_first_step_does_not_advance_time():
     animator = make_animator(tennis())
-    animator.on_speed(5)
     animator.time = 0.0
     animator.last_tick = None  # as at construction and after any resume
     animator.step(0)
@@ -120,7 +109,7 @@ def test_pause_and_end_pause_the_animation():
     animator.time = animator.t_end - 1e-9
     animator.last_tick = time.perf_counter() - 0.1
     animator.step(0)
-    animator.restart()
+    animator.toggle_pause()
     assert calls == ["pause", "resume", "pause", "resume"]
 
 
@@ -186,30 +175,21 @@ def test_toggle_pause_flips_and_restarts_at_end():
     assert animator.time == 0.0 and animator.playing is True
 
 
-def test_restart_resets_time_and_banner():
+def test_resume_at_end_restarts():
     animator = make_animator(tennis())
-    animator.time = animator.t_end
-    animator.step(0)
-    animator.restart()
-    assert animator.time == 0.0
-    assert animator.playing is True
+    animator.scrubber.set_val(animator.t_end)
+    animator.set_playing(False)
+    assert animator.banner.get_visible()
+    animator.toggle_pause()
+    assert animator.time == 0.0 and animator.playing is True
     assert not animator.banner.get_visible()
 
 
-def test_on_speed_updates_label():
+def test_banner_hidden_until_end_of_run():
     animator = make_animator(tennis())
-    animator.on_speed(5)
-    assert "x10" in animator.time_label.get_text()
-    assert animator.speed_slider.valtext.get_text() == "x10"
-
-
-def test_keys_toggle_and_restart():
-    animator = make_animator(tennis())
-    animator.on_key(FakeKey(" "))
-    assert animator.playing is False
-    animator.time = 4.0
-    animator.on_key(FakeKey("r"))
-    assert animator.time == 0.0 and animator.playing is True
+    assert not animator.banner.get_visible()
+    animator.scrubber.set_val(animator.t_end / 2)
+    assert not animator.banner.get_visible()
 
 
 def test_main_missing_file_exits_with_message():

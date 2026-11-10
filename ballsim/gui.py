@@ -151,7 +151,6 @@ class App:
         self.anim_canvas.get_tk_widget().pack(fill="both", expand=True)
         self.animator = animation.Animator(fig, params)
         self.anim_canvas.draw()
-        self.anim_canvas.get_tk_widget().focus_set()  # key presses need focus
         self.status.set(f"Animating {params.name}")
 
     def close_animation(self) -> None:
