@@ -16,98 +16,10 @@ def fail(message: str, hint: str) -> None:
     sys.exit(1)
 
 
-def venv_python() -> str:
-    """Return the path of the python program inside the venv."""
-    if os.name == "nt":
-        return str(VENV / "Scripts" / "python.exe")
-    return str(VENV / "bin" / "python")
-
-
-def check_python() -> None:
-    """Step 1: Python must be 3.10 or newer."""
-    print("[1/6] Python version")
-    if sys.version_info < (3, 10):
-        found = ".".join(str(n) for n in sys.version_info[:3])
-        fail(f"found Python {found}", "install Python 3.10 or newer")
-    print("ok")
-
-
-def check_tk(no_gui: bool) -> None:
-    """Step 2: tkinter must import in this interpreter, the venv inherits it."""
-    print("[2/6] Tk for the GUI")
-    result = subprocess.run([sys.executable, "-c", "import tkinter"], check=False)
-    if result.returncode == 0:
-        print("ok")
-        return
-    print("Tk is missing. Install it:")
-    print("  Debian/Ubuntu: sudo apt install python3-tk")
-    print("  Fedora: sudo dnf install python3-tkinter")
-    print("  macOS: use the python.org installer, it includes Tk")
-    print("  Windows: re-run the Python installer and tick tcl/tk")
-    if not no_gui:
-        sys.exit(1)
-    print("warning: continuing because of --no-gui")
-
-
-def make_venv() -> None:
-    """Step 3: create .venv if it does not exist."""
-    print("[3/6] Virtual environment")
-    if Path(venv_python()).exists():
-        print("exists, reused")
-        return
-    result = subprocess.run([sys.executable, "-m", "venv", ".venv"], check=False)
-    if result.returncode != 0:
-        fail("could not create .venv",
-             "on Debian/Ubuntu run: sudo apt install python3-venv, "
-             "then delete the .venv folder and run this script again")
-    print("ok")
-
-
-def install() -> None:
-    """Step 4: install requirements.txt into the venv."""
-    print("[4/6] Install requirements")
-    cmd = [venv_python(), "-m", "pip", "install", "--disable-pip-version-check",
-           "-r", "requirements.txt"]
+def must(cmd: list, message: str, hint: str) -> None:
+    """Run a command. Call fail with the hint if it exits with a non-zero code."""
     if subprocess.run(cmd, check=False).returncode != 0:
-        fail("pip install failed",
-             "check the network, or delete the .venv folder and run this script again")
-    print("ok")
-
-
-def verify(no_tests: bool) -> bool:
-    """Step 5: import the packages, then run the tests. Return True if all is well."""
-    print("[5/6] Verify")
-    code = ("import numpy, matplotlib, pytest; "
-            "print(numpy.__version__, matplotlib.__version__, pytest.__version__)")
-    if subprocess.run([venv_python(), "-c", code], check=False).returncode != 0:
-        fail("a package does not import", "delete .venv and run this script again")
-    if no_tests:
-        print("tests skipped")
-        return True
-    result = subprocess.run([venv_python(), "-m", "pytest", "-q"],
-                            capture_output=True, text=True, check=False)
-    lines = result.stdout.strip().splitlines()
-    print(lines[-1] if lines else "no test output")
-    if result.returncode != 0:
-        print("tests failed, the GUI may still run")
-        return False
-    print("ok")
-    return True
-
-
-def launch(no_gui: bool) -> int:
-    """Step 6: print the manual commands, then start the GUI and wait for it."""
-    print("[6/6] Launch")
-    if os.name == "nt":
-        print("Later, activate with: .venv\\Scripts\\activate")
-    else:
-        print("Later, activate with: source .venv/bin/activate")
-    print("Then run: python -m ballsim --gui")
-    if no_gui:
-        print("skipped (--no-gui)")
-        return 0
-    print("starting the GUI, close its window to finish")
-    return subprocess.call([venv_python(), "-m", "ballsim", "--gui"])
+        fail(message, hint)
 
 
 def main() -> None:
@@ -119,12 +31,69 @@ def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):  # absent in some IDE consoles
         sys.stdout.reconfigure(line_buffering=True)  # keep our lines in order with child output
     os.chdir(ROOT)
-    check_python()
-    check_tk(args.no_gui)
-    make_venv()
-    install()
-    tests_ok = verify(args.no_tests)
-    gui_code = launch(args.no_gui)
+    python = str(VENV / ("Scripts/python.exe" if os.name == "nt" else "bin/python"))
+
+    print("[1/6] Python version")
+    if sys.version_info < (3, 10):
+        found = ".".join(str(n) for n in sys.version_info[:3])
+        fail(f"found Python {found}", "install Python 3.10 or newer")
+    print("ok")
+
+    print("[2/6] Tk for the GUI")
+    if subprocess.run([sys.executable, "-c", "import tkinter"], check=False).returncode == 0:
+        print("ok")
+    else:
+        print("Tk is missing. Install it:")
+        print("  Debian/Ubuntu: sudo apt install python3-tk")
+        print("  Fedora: sudo dnf install python3-tkinter")
+        print("  macOS: use the python.org installer, it includes Tk")
+        print("  Windows: re-run the Python installer and tick tcl/tk")
+        if not args.no_gui:
+            sys.exit(1)
+        print("warning: continuing because of --no-gui")
+
+    print("[3/6] Virtual environment")
+    if Path(python).exists():
+        print("exists, reused")
+    else:
+        must([sys.executable, "-m", "venv", ".venv"], "could not create .venv",
+             "on Debian/Ubuntu run: sudo apt install python3-venv, "
+             "then delete the .venv folder and run this script again")
+        print("ok")
+
+    print("[4/6] Install requirements")
+    must([python, "-m", "pip", "install", "--disable-pip-version-check",
+          "-r", "requirements.txt"], "pip install failed",
+         "check the network, or delete the .venv folder and run this script again")
+    print("ok")
+
+    print("[5/6] Verify")
+    must([python, "-c", "import numpy, matplotlib, pytest; "
+          "print(numpy.__version__, matplotlib.__version__, pytest.__version__)"],
+         "a package does not import", "delete .venv and run this script again")
+    tests_ok = True
+    if args.no_tests:
+        print("tests skipped")
+    else:
+        result = subprocess.run([python, "-m", "pytest", "-q"],
+                                capture_output=True, text=True, check=False)
+        lines = result.stdout.strip().splitlines()
+        print(lines[-1] if lines else "no test output")
+        tests_ok = result.returncode == 0
+        print("ok" if tests_ok else "tests failed, the GUI may still run")
+
+    print("[6/6] Launch")
+    if os.name == "nt":
+        print("Later, activate with: .venv\\Scripts\\activate")
+    else:
+        print("Later, activate with: source .venv/bin/activate")
+    print("Then run: python -m ballsim --gui")
+    gui_code = 0
+    if args.no_gui:
+        print("skipped (--no-gui)")
+    else:
+        print("starting the GUI, close its window to finish")
+        gui_code = subprocess.call([python, "-m", "ballsim", "--gui"])
     sys.exit(0 if tests_ok and gui_code == 0 else 1)
 
 
