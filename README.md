@@ -24,6 +24,8 @@ python3 start.py    # any system (python start.py on Windows)
 
 Options: `--no-gui` sets up and tests only. `--no-tests` skips the test run.
 
+If `./start.sh` reports "permission denied", your unzip tool dropped the executable bit. Run `sh start.sh` or `python3 start.py` instead.
+
 The script uses the interpreter inside `.venv` itself, so you do not need to activate the environment.
 To work by hand later, activate it (`source .venv/bin/activate` on Linux and macOS, `.venv\Scripts\activate` on Windows) and run `python -m ballsim --gui`.
 
@@ -41,7 +43,7 @@ Paths are relative to this folder. Test names are in `tests/` unless the path sa
 | Forces at time t from the current x and v, then numerical integration | `simulation.py`, `run` passes `accel(state)` to the integrator | `test_integrators.py::test_simple_step_matches_brief_formula` |
 | The brief scheme, plus a built-in alternative | `ballsim/integrators.py`, `simple_step` and `rk4_step` | `test_simple_step_matches_brief_formula`, `test_rk4_exact_for_constant_acceleration`, `test_simulation.py::test_rk4_more_accurate_and_both_converge` |
 | Calculate x, v and a | `Trajectory` in `simulation.py`, CSV columns `t,x,v,a`, three plot panels | `test_cli.py::test_cli_prints_summary_and_csv`, `test_simulation.py::test_free_fall_matches_closed_form` |
-| User varies CD, rho, r, m, g, G, M, R, initial height and velocity, finish time, time step | `Parameters` and `validate` in `ballsim/parameters.py`, one preset key and one GUI entry each | `test_presets.py::test_invalid_field_named` (one case per checked field), `test_newtonian_needs_positive_planet`, `test_simulation.py::test_upward_throw_still_impacts` |
+| User varies CD, rho, r, m, g, G, M, R, initial height and velocity, finish time, time step | `Parameters` and `validate` in `ballsim/parameters.py`, one preset key and one GUI entry each | `test_presets.py::test_invalid_field_named` (one case for each checked field except G and M), `test_newtonian_needs_positive_planet`, `test_simulation.py::test_upward_throw_still_impacts` |
 | Model valid for x > 0, x = 0 is impact, R + x = 0 not handled | `run` stops at the first x <= 0 and interpolates to x = 0. `validate` requires a positive initial height and R | `test_simulation.py::test_impact_time_interpolated` |
 | Tests and visualisations | `tests/`, `extras/tests/`, `ballsim/plotting.py`, `ballsim/gui.py`, `extras/animate.py` | 83 tests in total, `test_plotting.py::test_plot_smoke`, `extras/tests/test_animate.py` |
 | Easy to extend, easy to change the input format | `Force` base class, `INTEGRATORS`, `make_forces`, `load_preset` | `test_integrators.py::test_names_match_parameters`, `test_presets.py::test_round_trip`, `test_unknown_key_rejected` |
@@ -343,7 +345,7 @@ I read the brief and settled the design in structured question sessions. I made 
 The core took 12 decisions: scope, ground handling, integrators, force structure, inputs, GUI toolkit, plots, tests, presets, packaging, numerics and code style.
 The animation took 22 more decisions, plus the set-up of the repository.
 
-I wrote the decisions down before any code.
+Before any code, an AI assistant recorded each decision.
 The glossary is in `CONTEXT.md`. The implementation plans are not in this archive.
 
 AI coding assistants (Claude Code) wrote the code and the tests from those decisions.
@@ -361,10 +363,10 @@ They confirmed 16 findings, and all 16 were fixed. Four examples:
 * Nothing limited the number of steps.
 * This README had a wrong statement about large time steps. It now gives the measured values.
 
-For the animation, I measured playback on a real display.
+For the animation, a reviewer measured playback on a real screen.
 It ran at about a quarter of the labelled speed, because each full redraw takes about 0.13 s.
 The fix advances the animation time by the elapsed wall-clock time.
-I also measured the idle CPU load during a pause, and removed it.
+The same review measured the idle CPU load during a pause, and the fix removed it.
 
 I tested the GUI and the animation by hand on Linux.
 The core is one commit on `main`. The animation is on its own branch, with one commit per task.
