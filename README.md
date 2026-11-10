@@ -1,18 +1,20 @@
 # Ball drop simulation
 
-## What it does
+This program simulates a ball that falls in one dimension under gravity and quadratic drag.
+It answers the TOYOTA Racing coding challenge for a Simulation Engineer.
+It needs Python 3.10 or newer, numpy and matplotlib.
 
-This program simulates a ball that falls in one dimension. Gravity and quadratic drag act on the ball.
-The program runs from an initial height and velocity until impact or until the finish time.
-It plots height, velocity and acceleration against time.
-You can run it from the command line or from a small Tk window.
-Two presets ship with it: a tennis ball (constant gravity) and a satellite re-entry (Newtonian gravity).
+![Height, velocity and acceleration of the tennis ball and the satellite re-entry presets on shared axes](docs/plot_overlay.png)
+
+The plot overlays the two shipped presets.
+On shared axes the tennis ball (100 m, about 7 s) is a flat line near zero in the height and velocity panels.
+Its curve is clear only in the acceleration panel.
 
 `CONTEXT.md` defines the terms in this file (run, preset, trajectory and so on).
 
 ## Quick start
 
-One command sets up a virtual environment, installs the requirements, runs the tests and opens the GUI.
+One command sets up a virtual environment, installs the requirements, runs the core tests and opens the GUI.
 
 ```
 ./start.sh          # Linux and macOS
@@ -24,6 +26,43 @@ Options: `--no-gui` sets up and tests only. `--no-tests` skips the test run.
 
 The script uses the interpreter inside `.venv` itself, so you do not need to activate the environment.
 To work by hand later, activate it (`source .venv/bin/activate` on Linux and macOS, `.venv\Scripts\activate` on Windows) and run `python -m ballsim --gui`.
+
+## What the brief asks and where it is met
+
+Paths are relative to this folder. Test names are in `tests/` unless the path says otherwise.
+
+| Brief requirement | Where in the code | Test that proves it |
+|:--|:--|:--|
+| Drag `\|FD\| = CD rho v^2 pi r^2`, opposite to motion | `ballsim/forces.py`, `QuadraticDrag` | `test_forces.py::test_drag_opposes_motion`, `test_simulation.py::test_terminal_velocity` |
+| Constant gravity `FW = m g` | `forces.py`, `ConstantGravity` | `test_forces.py::test_constant_gravity`, `test_simulation.py::test_free_fall_matches_closed_form` |
+| Newtonian gravity `-FW = G M m / (R + x)^2` | `forces.py`, `NewtonianGravity` | `test_forces.py::test_newtonian_at_ground`, `test_newtonian_falls_off_with_height`, `test_simulation.py::test_newtonian_matches_constant_for_huge_planet` |
+| User picks the gravity model | `Parameters.gravity_model`, `make_forces` in `simulation.py`, GUI menu | `test_presets.py::test_shipped_presets_load`, `test_invalid_field_named[gravity_model-moon]` |
+| `FW + FD = m a` | `simulation.py`, `acceleration` | `test_simulation.py::test_newtonian_acceleration_at_ground`, `extras/tests/test_quantities.py::test_net_is_drag_plus_weight` |
+| Forces at time t from the current x and v, then numerical integration | `simulation.py`, `run` passes `accel(state)` to the integrator | `test_integrators.py::test_simple_step_matches_brief_formula` |
+| The brief scheme, plus a built-in alternative | `ballsim/integrators.py`, `simple_step` and `rk4_step` | `test_simple_step_matches_brief_formula`, `test_rk4_exact_for_constant_acceleration`, `test_simulation.py::test_rk4_more_accurate_and_both_converge` |
+| Calculate x, v and a | `Trajectory` in `simulation.py`, CSV columns `t,x,v,a`, three plot panels | `test_cli.py::test_cli_prints_summary_and_csv`, `test_simulation.py::test_free_fall_matches_closed_form` |
+| User varies CD, rho, r, m, g, G, M, R, initial height and velocity, finish time, time step | `Parameters` and `validate` in `ballsim/parameters.py`, one preset key and one GUI entry each | `test_presets.py::test_invalid_field_named` (one case per checked field), `test_newtonian_needs_positive_planet`, `test_simulation.py::test_upward_throw_still_impacts` |
+| Model valid for x > 0, x = 0 is impact, R + x = 0 not handled | `run` stops at the first x <= 0 and interpolates to x = 0. `validate` requires a positive initial height and R | `test_simulation.py::test_impact_time_interpolated` |
+| Tests and visualisations | `tests/`, `extras/tests/`, `ballsim/plotting.py`, `ballsim/gui.py`, `extras/animate.py` | 83 tests in total, `test_plotting.py::test_plot_smoke`, `extras/tests/test_animate.py` |
+| Easy to extend, easy to change the input format | `Force` base class, `INTEGRATORS`, `make_forces`, `load_preset` | `test_integrators.py::test_names_match_parameters`, `test_presets.py::test_round_trip`, `test_unknown_key_rejected` |
+| Instructions to compile, run and test | This file, `start.py` | `test_cli.py` (the start scripts have no automated test) |
+| One zip named with first and last name | `PrashantKumar.zip`, see the last section | None |
+
+No test checks a negative G or M. `validate` rejects them, but only in the Newtonian model.
+
+## Scope
+
+The core answers the brief: `ballsim/`, `tests/` and `presets/`.
+`extras/` is an optional animation. I added it after the core was complete, and the core did not change for it.
+`start.py`, `start.sh` and `start.bat` are a convenience for setup.
+
+Suggested reading order for the core:
+
+1. `ballsim/parameters.py`: the inputs and their validation.
+2. `ballsim/forces.py`: gravity and drag.
+3. `ballsim/integrators.py`: the time-stepping schemes.
+4. `ballsim/simulation.py`: the run loop and the trajectory.
+5. Then `presets.py`, `plotting.py`, `__main__.py` (the command line) and `gui.py`.
 
 ## Physics
 
@@ -80,12 +119,13 @@ pip install -r requirements.txt
 ```
 
 The `source` line is for Linux and macOS. On Windows, use `.venv\Scripts\activate` instead.
+On Debian and Ubuntu, `python -m venv` can need the `python3-venv` package.
 
-The dependencies are numpy, matplotlib and pytest.
+The dependencies are numpy, matplotlib and pytest. `requirements.txt` does not pin versions.
 
 ## Run
 
-Run all commands from this folder.
+Run all commands from this folder, with the environment active.
 
 ```
 python -m ballsim presets/tennis_ball.json
@@ -95,7 +135,13 @@ python -m ballsim presets/tennis_ball.json --csv out.csv --no-plot
 python -m ballsim presets/tennis_ball.json presets/satellite_reentry.json --csv out.csv --no-plot
 ```
 
-Each command prints one summary line per run.
+Each command prints one summary line per run. For the two presets, the output is:
+
+```
+tennis ball: impact at t = 7.348 s, v = -16.088 m/s, max speed 16.088 m/s
+satellite re-entry: impact at t = 144.732 s, v = -1386.184 m/s, max speed 1386.184 m/s
+```
+
 A plot window opens unless you give `--no-plot`.
 With two presets, the plot window overlays both runs.
 
@@ -108,7 +154,7 @@ Options:
 
 With one run, `--csv out.csv` writes `out.csv`.
 With several runs, the program adds the run name to the file name.
-The example above writes `out_tennis_ball.csv` and `out_satellite_re-entry.csv`.
+The last example above writes `out_tennis_ball.csv` and `out_satellite_re-entry.csv`.
 
 GUI (two equivalent commands):
 
@@ -129,6 +175,11 @@ The animation replays one run. It shows:
 * Gauges for drag, weight, speed and energy.
 * A text readout with the current values, such as terminal velocity, energy lost to drag and numerical error.
 
+![One animation frame of the tennis ball preset at t = 3 s](docs/animation_frame.png)
+
+The frame shows the tennis ball at t = 3 s, at a height of 69.31 m.
+The dashed line in the velocity graph is the terminal velocity, 16.09 m/s.
+
 Start it in one of two ways:
 
 ```
@@ -141,16 +192,10 @@ Controls:
 
 * Pause and Resume, or press space. At the end of the run, Resume starts the run again.
 * Restart, or press r.
-* The speed slider has the steps x0.25, x0.5, x1, x2, x5, x10, x20, x50 and x100. The animation starts at the fastest step that keeps playback at or above 10 s. The shipped presets play for about 15 s.
+* The speed slider has the steps x0.25, x0.5, x1, x2, x5, x10, x20, x50 and x100. The animation starts at the fastest step that keeps playback at or above 10 s. The shipped presets play for about 15 s (tennis ball at x0.5, satellite at x10).
 * The time slider moves to any moment of the run.
 
 When the run ends, a banner shows the result. If the ball reaches the ground, it shows the impact time and velocity. If the run ends at the finish time without impact, it shows the height.
-
-Run the tests of the extra with:
-
-```
-pytest -q extras/tests
-```
 
 The extra adds a feature without changing the run loop, the data model or the core tests.
 The GUI imports it only when you press Animate.
@@ -164,21 +209,45 @@ Module map of the extra:
 ## Preset format
 
 A preset is a flat JSON file. The keys are the field names of `Parameters` in `ballsim/parameters.py`.
-Missing keys take the default values. Unknown keys raise an error.
+`presets/tennis_ball.json` shows every key.
+All values are in SI units: metres, kilograms, seconds.
+Missing keys take the default values, which are the tennis ball values. Unknown keys raise an error.
 The program checks the values and names the field that is wrong.
 
 ## Test
 
+Run the commands from this folder, with the environment active.
+
 ```
-pytest -q
+python -m pytest -q                       # core: 48 tests
+python -m pytest -q extras/tests          # extra: 35 tests, about 13 s
+python -m pytest -q tests extras/tests    # both: 83 tests
 ```
 
-* `tests/test_forces.py` proves that drag opposes motion and that both gravity models give the expected force.
-* `tests/test_integrators.py` proves that `simple_step` follows the brief formula and that `rk4_step` is exact for constant acceleration.
-* `tests/test_simulation.py` proves free fall against the closed form, impact interpolation, terminal velocity and the Newtonian limit.
-* `tests/test_presets.py` proves the JSON round trip, the shipped presets and the validation errors.
-* `tests/test_plotting.py` proves that plotting a trajectory runs without error.
-* `tests/test_cli.py` proves the printed summary and the CSV files for one and two presets.
+`pyproject.toml` sets `testpaths = ["tests"]`, so the first command runs the core tests only.
+`start.py` runs the same core tests.
+
+What each test file proves:
+
+* `tests/test_forces.py`: drag opposes motion and has the exact magnitude. Both gravity models give the expected force.
+* `tests/test_integrators.py`: `simple_step` follows the brief formula. `rk4_step` is exact for constant acceleration and beats `simple_step` on a spring.
+* `tests/test_simulation.py`: free fall, impact, terminal velocity, the Newtonian limit, convergence, and a last sample exactly at the finish time.
+* `tests/test_presets.py`: the JSON round trip, defaults, the shipped presets and one validation error per checked field.
+* `tests/test_plotting.py`: plotting a trajectory runs without error.
+* `tests/test_cli.py`: the printed summary, the CSV files for one and two presets, and clean exits for bad input.
+* `extras/tests/test_quantities.py`: forces, terminal speed, potential energy and the energy balance.
+* `extras/tests/test_animate.py`: frames draw for both presets, playback timing, pause, restart, the sliders and the keys.
+
+How the tests show that the physics is correct:
+
+* Closed-form free fall: with no drag, x, v and a match `x0 + v0 t - g t^2 / 2` to 1e-6 m for both integrators.
+* Impact time: with no drag, the interpolated impact time matches `sqrt(2 h / g)`. An upward throw matches the root of the quadratic.
+* Terminal velocity: a long drop reaches `sqrt(m g / (CD rho pi r^2))` within 1 %, and the acceleration goes to zero.
+* Newtonian limit: for a very large planet with the same surface gravity, the Newtonian impact time matches the constant-gravity one.
+* Integrator convergence: against the `tanh` solution for drag and constant gravity, both errors fall when dt halves, and rk4 is always more accurate.
+* Energy balance (extra): without drag, the energy stays constant to 1e-9 of the start energy before impact. With drag, kinetic plus potential plus energy lost to drag stays within 1e-3 of the start energy.
+
+The GUI has no automated test. I tested it by hand.
 
 ## Module map
 
@@ -203,6 +272,8 @@ New gravity model:
 2. Add one branch for it in `make_forces` in `simulation.py`.
 3. Add its name to `GRAVITY_MODELS` in `parameters.py`.
 4. Add the parameters it needs to `Parameters` and `validate`.
+5. Add a unit label for each new parameter to `UNITS` in `gui.py`.
+6. Add its potential energy to `potential_energy` in `extras/quantities.py`. If you do not, Animate fails for the new model.
 
 New atmosphere: write a new drag class that finds the density from a `density(x)` method.
 An exponential atmosphere is one example.
@@ -217,15 +288,33 @@ New integrator:
 New input format:
 
 1. Write one reader that returns `Parameters`, as `load_preset` does. A `load_csv_preset` function is one example.
-2. Call it where the program loads a file: `main` in `__main__.py` and `App.load` in `gui.py`. Pick the reader by file suffix.
+2. Call it where the program loads a file: `main` in `ballsim/__main__.py`, `App.load` in `ballsim/gui.py` and `main` in `extras/animate.py`. Pick the reader by file suffix.
 3. Add the new suffix to `JSON_TYPES` in `gui.py` so the file dialog shows the file.
+
+The run loop takes only `Parameters`, so a new format does not change the simulation.
 
 2-D motion, about four small edits:
 
-1. `State` holds position and velocity as numpy vectors, and each force returns a vector. Drag uses the speed `norm(v)` in place of `abs(v)`. The integrators work unchanged, they only add and scale.
+1. `State` holds position and velocity as numpy vectors, and each force returns a vector. Drag uses the speed `norm(v)` in place of `abs(v)`. The integrators work unchanged, because they only add and scale.
 2. `run` tests the height component for the ground and interpolates on it.
 3. `Trajectory` and `write_csv` get one column per component.
 4. `plotting` picks the components to draw.
+
+## Many users, many purposes: problems to expect
+
+The brief asks me to imagine that many people use this code, from tennis balls to satellite re-entry.
+These are the problems I expect, each with my answer.
+
+* **Silent defaults.** A preset that omits a key gets the tennis ball value. A satellite preset without `fluid_density` runs in sea-level air, with no warning. Answer: make the physical inputs required, or log each default that the loader uses.
+* **Preset versions.** `load_preset` rejects unknown keys, and `save_preset` writes no version. A preset from a newer build fails on an older build, and a renamed field breaks every saved preset. Answer: add a `schema_version` key and a small migration step in `load_preset`.
+* **Implicit units.** All values are bare SI numbers. A user who types 100 for a height of 100 km gets a valid but wrong run. Answer: state the units in the preset format, convert units at the input boundary (for example with pint), and warn about implausible values.
+* **Constant density for re-entry.** The satellite preset uses 1e-5 kg/m^3 from 100 km to the ground, so it hits at 1386 m/s. That is not physical. CD has no Mach effect. Answer: add an atmosphere model as a `density(x)` drag class in `make_forces`, and keep the constant model as the default.
+* **One fixed step for all regimes.** Neither integrator controls its error. For the tennis ball, `simple` at dt = 2 s gives -10.2 m/s at impact against about -16.1 m/s. `rk4` at dt = 5 s reports an upward impact at +965 m/s. No warning appears. Answer: add an adaptive integrator with an impact event, and warn when dt is large against the time scale `v_terminal / g`.
+* **The ten-million-step cap.** `validate` rejects runs with more than 1e7 steps, so a one-day decay at dt = 0.001 s fails. `run` also allocates memory for every possible step, even when impact comes early. Answer: use adaptive steps, keep every k-th sample, or stream samples to disk. Make the cap a documented setting.
+* **CSV files without a source.** `write_csv` writes only `t,x,v,a`, with no parameters, units or code version. Another team cannot reproduce the run. Answer: write the preset as a JSON file next to each CSV, and add the git hash and units to the header.
+* **Shared plot axes.** Overlaid runs of different scale hide the small run, as the image at the top shows. Answer: offer one figure per run, normalised axes or log scales, chosen by a command-line flag.
+* **A new gravity model touches many files.** It needs edits in six places (see How to extend). If `potential_energy` is not updated, Animate fails although `run` works. Answer: register each model in one place, with its class, parameters and potential energy. Add a test that runs every model in `GRAVITY_MODELS` through `run` and `compute`.
+* **1-D only, no time argument.** Real re-entry and tennis shots move mostly sideways. `validate` rejects a start from the ground, because the initial height must be above zero. `Force.force` has no time argument, so wind gusts or thrust need a change to every force. Answer: move `State` to vectors. Add `t` to the force signature now, while few forces exist. Allow x = 0 with v > 0 at the start.
 
 ## With more time
 
@@ -243,4 +332,65 @@ New input format:
 * The code does not handle R + x = 0 in the Newtonian model.
 * The impact time and velocity come from linear interpolation, so they are approximate.
 * Both integrators are explicit and have no step control. A time step above about 1 s gives wrong values for the tennis ball with either scheme. At very large steps rk4 is not safer than simple: at dt = 5 s it reports an upward impact. Keep the step below about 0.5 s for the tennis ball, or add an adaptive step (see With more time).
+* The animation draws about 7 to 8 frames per second, because each frame redraws the whole figure. Playback speed stays correct, because time advances by the elapsed wall-clock time.
+* I ran the code only on Linux with Python 3.14. I did not run `start.bat` on Windows, and I did not run anything on macOS.
+* `requirements.txt` does not pin versions, so a future numpy or matplotlib release can break the code.
 * The GUI has no automated test. Check it by hand.
+
+## How this was built
+
+I read the brief and settled the design in structured question sessions. I made every decision in those sessions.
+The core took 12 decisions: scope, ground handling, integrators, force structure, inputs, GUI toolkit, plots, tests, presets, packaging, numerics and code style.
+The animation took 22 more decisions, plus the set-up of the repository.
+
+I wrote the decisions down before any code.
+The glossary is in `CONTEXT.md`. The implementation plans are not in this archive.
+
+AI coding assistants (Claude Code) wrote the code and the tests from those decisions.
+The work was test first. Each task started with a failing test, then the smallest code that made it pass.
+A separate AI reviewer checked every task against the plan before the commit.
+Its findings were fixed before the commit.
+
+After the core was complete, an independent review panel examined it through six lenses.
+The lenses were brief compliance, physics and numerics, readability, extensibility, tests and documentation.
+The panel raised 46 findings. Two sceptical verifiers checked each serious finding.
+They confirmed 16 findings, and all 16 were fixed. Four examples:
+
+* A bare `pytest` command could not import the package.
+* The run loop had dead lines.
+* Nothing limited the number of steps.
+* This README had a wrong statement about large time steps. It now gives the measured values.
+
+For the animation, I measured playback on a real display.
+It ran at about a quarter of the labelled speed, because each full redraw takes about 0.13 s.
+The fix advances the animation time by the elapsed wall-clock time.
+I also measured the idle CPU load during a pause, and removed it.
+
+I tested the GUI and the animation by hand on Linux.
+The core is one commit on `main`. The animation is on its own branch, with one commit per task.
+The history is in a private GitHub repository and is available on request.
+I am responsible for every line, and I expect to walk through it at the interview.
+
+## What this archive contains
+
+```
+PrashantKumar/
+  README.md, CONTEXT.md            this guide and the glossary
+  ballsim/                         the simulation package (the core)
+  tests/                           the core tests (48)
+  presets/                         the tennis ball and satellite re-entry presets
+  extras/                          the optional animation and its tests (35)
+  docs/                            the two images in this README
+  start.py, start.sh, start.bat    the one-command setup
+  requirements.txt, pyproject.toml the dependencies and the pytest settings
+  .gitattributes, .gitignore       line-ending and ignore rules
+```
+
+I built the archive with this command:
+
+```
+git archive --format=zip --prefix=PrashantKumar/ -o PrashantKumar.zip HEAD
+```
+
+So it holds exactly the version-controlled files.
+It holds no virtual environment, no caches and no git history.
