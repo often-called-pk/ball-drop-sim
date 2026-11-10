@@ -42,10 +42,7 @@ def make_forces(params: Parameters) -> list[Force]:
 
 def acceleration(state: State, ball: Ball, forces: list[Force]) -> float:
     """Newton's second law: net force over mass."""
-    total = 0.0
-    for force in forces:
-        total += force.force(state, ball)
-    return total / ball.mass
+    return sum(force.force(state, ball) for force in forces) / ball.mass
 
 
 def run(params: Parameters) -> Trajectory:
@@ -78,20 +75,19 @@ def run(params: Parameters) -> Trajectory:
         t_new = finish if i == n else i * dt_nominal
         dt = t_new - t[i - 1]
         new = step(state, dt, accel)
-        if new.x <= 0:
+        hit = new.x <= 0
+        if hit:
             # Step crossed the ground: interpolate linearly between the two samples.
             frac = state.x / (state.x - new.x)
-            t[i] = t[i - 1] + frac * dt
-            x[i] = 0.0
-            v[i] = state.v + frac * (new.v - state.v)
-            a[i] = accel(State(0.0, v[i]))
-            impact_time, impact_velocity = float(t[i]), float(v[i])
-            last = i
-            break
+            t_new = t[i - 1] + frac * dt
+            new = State(0.0, state.v + frac * (new.v - state.v))
         t[i], x[i], v[i] = t_new, new.x, new.v
         a[i] = accel(new)
-        state = new
         last = i
+        if hit:
+            impact_time, impact_velocity = float(t_new), float(new.v)
+            break
+        state = new
 
     end = last + 1
     return Trajectory(

@@ -8,12 +8,8 @@ from pathlib import Path
 from ballsim.parameters import TEXT_FIELDS, Parameters, validate
 
 
-def load_preset(path: str | Path) -> Parameters:
-    """Read a preset file, fill gaps with defaults and validate it."""
-    with open(path) as f:
-        data = json.load(f)
-    if not isinstance(data, dict):
-        raise ValueError("preset must be a JSON object")
+def from_dict(data: dict) -> Parameters:
+    """Build validated Parameters from a dict of numbers or number texts."""
     unknown = sorted(set(data) - {f.name for f in fields(Parameters)})
     if unknown:
         raise ValueError(f"unknown preset key(s): {', '.join(unknown)}")
@@ -28,6 +24,15 @@ def load_preset(path: str | Path) -> Parameters:
     params = Parameters(**values)
     validate(params)
     return params
+
+
+def load_preset(path: str | Path) -> Parameters:
+    """Read a preset file, fill gaps with defaults and validate it."""
+    with open(path) as f:
+        data = json.load(f)
+    if not isinstance(data, dict):
+        raise ValueError("preset must be a JSON object")
+    return from_dict(data)
 
 
 def save_preset(params: Parameters, path: str | Path) -> None:

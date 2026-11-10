@@ -46,7 +46,7 @@ Paths are relative to this folder. Test names are in `tests/` unless the path sa
 | User varies CD, rho, r, m, g, G, M, R, initial height and velocity, finish time, time step | `Parameters` and `validate` in `ballsim/parameters.py`, one preset key and one GUI entry each | `test_presets.py::test_invalid_field_named` (one case for each checked field except G and M), `test_newtonian_needs_positive_planet`, `test_simulation.py::test_upward_throw_still_impacts` |
 | Model valid for x > 0, x = 0 is impact, R + x = 0 not handled | `run` stops at the first x <= 0 and interpolates to x = 0. `validate` requires a positive initial height and R | `test_simulation.py::test_impact_time_interpolated` |
 | Tests and visualisations | `tests/`, `extras/tests/`, `ballsim/plotting.py`, `ballsim/gui.py`, `extras/animate.py` | 83 tests in total, `test_plotting.py::test_plot_smoke`, `extras/tests/test_animate.py` |
-| Easy to extend, easy to change the input format | `Force` base class, `INTEGRATORS`, `make_forces`, `load_preset` | `test_integrators.py::test_names_match_parameters`, `test_presets.py::test_round_trip`, `test_unknown_key_rejected` |
+| Easy to extend, easy to change the input format | `Force` base class, `INTEGRATORS`, `make_forces`, `from_dict`, `load_preset` | `test_integrators.py::test_names_match_parameters`, `test_presets.py::test_round_trip`, `test_unknown_key_rejected`, `test_presets.py::test_from_dict_parses_entry_texts` |
 | Instructions to compile, run and test | This file, `start.py` | `test_cli.py` (the start scripts have no automated test) |
 | One zip named with first and last name | `PrashantKumar.zip`, see the last section | None |
 
@@ -257,7 +257,7 @@ The GUI has no automated test. I tested it by hand.
 * `ballsim/forces.py`: `Force` and its subclasses `ConstantGravity`, `NewtonianGravity` and `QuadraticDrag`.
 * `ballsim/integrators.py`: `simple_step`, `rk4_step` and the `INTEGRATORS` dictionary.
 * `ballsim/simulation.py`: `make_forces`, `acceleration`, `run`, `describe` and the `Trajectory` class.
-* `ballsim/presets.py`: `load_preset` and `save_preset`.
+* `ballsim/presets.py`: `from_dict`, `load_preset` and `save_preset`.
 * `ballsim/plotting.py`: `make_axes` and `add_trajectory`. It uses `Figure` and not pyplot, so the GUI can embed it.
 * `ballsim/__main__.py`: the command line, `write_csv` and `csv_path`.
 * `ballsim/gui.py`: the Tk window.
@@ -289,7 +289,7 @@ New integrator:
 
 New input format:
 
-1. Write one reader that returns `Parameters`, as `load_preset` does. A `load_csv_preset` function is one example.
+1. Write one reader that parses the file into a dict and calls `from_dict`, as `load_preset` does. A `load_csv_preset` function is one example.
 2. Call it where the program loads a file: `main` in `ballsim/__main__.py`, `App.load` in `ballsim/gui.py` and `main` in `extras/animate.py`. Pick the reader by file suffix.
 3. Add the new suffix to `JSON_TYPES` in `gui.py` so the file dialog shows the file.
 

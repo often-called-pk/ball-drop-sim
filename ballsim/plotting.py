@@ -20,10 +20,9 @@ def make_axes(fig: Figure) -> list[Axes]:
 def add_trajectory(axes: list[Axes], trajectory: Trajectory) -> None:
     """Draw one run on all three axes in one colour, with a dashed line at impact."""
     label = trajectory.label()
-    values = [trajectory.x, trajectory.v, trajectory.a]
-    colour = axes[0].plot(trajectory.t, values[0], label=label)[0].get_color()
-    axes[1].plot(trajectory.t, values[1], label=label, color=colour)
-    axes[2].plot(trajectory.t, values[2], label=label, color=colour)
+    colour = axes[0].plot(trajectory.t, trajectory.x, label=label)[0].get_color()
+    axes[1].plot(trajectory.t, trajectory.v, label=label, color=colour)
+    axes[2].plot(trajectory.t, trajectory.a, label=label, color=colour)
     if trajectory.impact_time is not None:
         for ax in axes:
             ax.axvline(trajectory.impact_time, linestyle="--", color=colour)

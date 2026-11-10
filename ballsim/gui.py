@@ -9,9 +9,9 @@ from matplotlib.axes import Axes
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
 
-from ballsim.parameters import GRAVITY_MODELS, INTEGRATOR_NAMES, TEXT_FIELDS, Parameters, validate
+from ballsim.parameters import GRAVITY_MODELS, INTEGRATOR_NAMES, Parameters
 from ballsim.plotting import add_trajectory, make_axes
-from ballsim.presets import load_preset, save_preset
+from ballsim.presets import from_dict, load_preset, save_preset
 from ballsim.simulation import describe, run as run_simulation
 
 CHOICES = {"gravity_model": GRAVITY_MODELS, "integrator": INTEGRATOR_NAMES}
@@ -72,18 +72,8 @@ class App:
             self.vars[field.name].set(str(getattr(params, field.name)))
 
     def read_fields(self) -> Parameters:
-        """Turn the entry texts into Parameters. Run validates the values."""
-        values = {}
-        for field in fields(Parameters):
-            text = self.vars[field.name].get()
-            if field.name not in TEXT_FIELDS:
-                try:
-                    values[field.name] = float(text)
-                except ValueError:
-                    raise ValueError(f"{field.name} must be a number, got '{text}'")
-            else:
-                values[field.name] = text
-        return Parameters(**values)
+        """Turn the entry texts into validated Parameters."""
+        return from_dict({name: var.get() for name, var in self.vars.items()})
 
     def load(self) -> None:
         path = filedialog.askopenfilename(filetypes=JSON_TYPES)
@@ -99,7 +89,6 @@ class App:
     def save(self) -> None:
         try:
             params = self.read_fields()
-            validate(params)
         except ValueError as error:
             self.status.set(str(error))
             return
@@ -146,7 +135,6 @@ class App:
             return
         try:
             params = self.read_fields()
-            validate(params)
         except ValueError as error:
             self.status.set(str(error))
             return

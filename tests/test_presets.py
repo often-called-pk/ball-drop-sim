@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from ballsim.parameters import Parameters, validate
-from ballsim.presets import load_preset, save_preset
+from ballsim.presets import from_dict, load_preset, save_preset
 
 
 def test_round_trip(tmp_path):
@@ -76,3 +76,20 @@ def test_preset_must_be_object(tmp_path):
     path.write_text("[1, 2]")
     with pytest.raises(ValueError, match="JSON object"):
         load_preset(path)
+
+
+def test_from_dict_parses_entry_texts():
+    loaded = from_dict({"name": "x", "mass": "2", "integrator": "rk4"})
+    assert loaded == replace(Parameters(), name="x", mass=2.0, integrator="rk4")
+
+
+def test_from_dict_bad_number_names_field():
+    with pytest.raises(ValueError, match="mass must be a number"):
+        from_dict({"mass": "abc"})
+
+
+def test_from_dict_rejects_unknown_key_and_invalid_value():
+    with pytest.raises(ValueError, match="mas"):
+        from_dict({"mas": "1"})
+    with pytest.raises(ValueError, match="^mass "):
+        from_dict({"mass": "0"})
