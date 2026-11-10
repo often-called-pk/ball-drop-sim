@@ -25,9 +25,11 @@ def test_cli_two_presets_two_csvs(tmp_path):
     assert (tmp_path / "out_satellite_re-entry.csv").exists()
 
 
-def test_cli_integrator_override_runs(capsys):
+def test_cli_integrator_override_changes_result(capsys):
+    main([TENNIS, "--no-plot"])
+    simple = capsys.readouterr().out
     main([TENNIS, "--no-plot", "--integrator", "rk4"])
-    assert "impact" in capsys.readouterr().out
+    assert capsys.readouterr().out != simple
 
 
 def test_cli_needs_a_preset():

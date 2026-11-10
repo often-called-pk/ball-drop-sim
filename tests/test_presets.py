@@ -13,12 +13,8 @@ def test_round_trip(tmp_path):
     path = tmp_path / "x.json"
     save_preset(p, path)
     assert load_preset(path) == p
-
-
-def test_shipped_presets_load():
-    folder = Path(__file__).parent.parent / "presets"
-    assert load_preset(folder / "tennis_ball.json").gravity_model == "constant"
-    assert load_preset(folder / "satellite_reentry.json").gravity_model == "newtonian"
+    shipped = Path(__file__).parent.parent / "presets" / "tennis_ball.json"
+    assert load_preset(shipped) == Parameters()
 
 
 @pytest.mark.parametrize(

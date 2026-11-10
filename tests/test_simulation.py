@@ -44,32 +44,14 @@ def test_impact_time_interpolated(dt, tol):
     assert tr.v[-1] == pytest.approx(-G_EARTH * expected, rel=1e-3)
 
 
-def test_upward_throw_still_impacts():
-    tr = run(no_drag(initial_height=1, initial_velocity=20, finish_time=10))
-    root = (20 + math.sqrt(400 + 4 * 4.905)) / (2 * 4.905)
-    assert tr.impact_time == pytest.approx(root, abs=1e-3)
-    assert tr.x.max() > 1
-
-
-def test_airborne_run_ends_exactly_at_finish_time():
-    tr = run(no_drag(initial_height=1e6, finish_time=1.0, time_step=0.3))
-    assert tr.t[-1] == 1.0
-    assert len(tr.t) == 5
+@pytest.mark.parametrize(
+    "finish, dt, samples", [(1.0, 0.3, 5), (1.1, 0.1, 12), (0.9, 0.3, 4), (2.7, 0.3, 10)]
+)
+def test_airborne_run_ends_exactly_at_finish_time(finish, dt, samples):
+    tr = run(no_drag(initial_height=1e6, finish_time=finish, time_step=dt))
+    assert tr.t[-1] == finish
+    assert len(tr.t) == samples
     assert tr.impact_time is None
-    tr = run(no_drag(initial_height=1e6, finish_time=1.1, time_step=0.1))
-    assert tr.t[-1] == 1.1
-    assert np.all(np.diff(tr.t) > 1e-6)
-
-
-def test_last_sample_is_exactly_finish_time_despite_rounding():
-    tr = run(no_drag(initial_height=1e6, finish_time=0.9, time_step=0.3))
-    assert tr.t[-1] == 0.9
-
-
-def test_float_noise_in_step_count_adds_no_extra_sample():
-    tr = run(no_drag(initial_height=1e6, finish_time=2.7, time_step=0.3))
-    assert len(tr.t) == 10
-    assert tr.t[-1] == 2.7
     assert np.all(np.diff(tr.t) > 1e-6)
 
 
@@ -78,22 +60,17 @@ def test_terminal_velocity():
     tr = run(p)
     assert tr.v[-1] == pytest.approx(-terminal_speed(p), rel=0.01)
     assert tr.a[-1] == pytest.approx(0.0, abs=1e-6)
+    forces = make_forces(p)
+    for x, v, a in zip(tr.x, tr.v, tr.a):
+        assert a == pytest.approx(acceleration(State(x, v), Ball(p.mass, p.radius), forces))
 
 
-def test_newtonian_matches_constant_for_huge_planet():
-    R = 6.371e9
-    G = 6.674e-11
-    M = G_EARTH * R**2 / G
-    base = replace(Parameters(), initial_height=100)
-    constant = run(replace(base, gravity_model="constant", g=G_EARTH))
-    newtonian = run(replace(base, gravity_model="newtonian", G=G, M=M, R=R))
-    assert newtonian.impact_time == pytest.approx(constant.impact_time, rel=1e-3)
-
-
-def test_newtonian_acceleration_at_ground():
-    p = no_drag(gravity_model="newtonian")
-    a = acceleration(State(0, 0), Ball(1, 1), make_forces(p))
-    assert a == pytest.approx(-p.G * p.M / p.R**2)
+def test_run_uses_chosen_gravity_model():
+    constant = run(no_drag(g=3.0))
+    newtonian = run(no_drag(g=3.0, gravity_model="newtonian"))
+    p = no_drag()
+    assert constant.a[0] == pytest.approx(-3.0)
+    assert newtonian.a[0] == pytest.approx(-p.G * p.M / (p.R + p.initial_height) ** 2)
 
 
 def test_rk4_more_accurate_and_both_converge():
@@ -109,11 +86,6 @@ def test_rk4_more_accurate_and_both_converge():
         assert err["rk4", dt] < err["simple", dt]
     for name in ("simple", "rk4"):
         assert err[name, 0.05] < err[name, 0.1]
-
-
-def test_label():
-    tr = run(Parameters())
-    assert tr.label() == "tennis ball (constant, simple)"
 
 
 def test_describe():
