@@ -53,7 +53,7 @@ Paths are relative to this folder.
 * `start.py`, `start.sh`, `start.bat`: the one-command setup. It checks Python and Tk, builds `.venv`, installs, tests and starts the GUI.
 
 The solution keeps to the core that the brief asks for, plus a small GUI to run it, and stops there.
-The next steps are in "Many users, many purposes: problems to expect" and in "Limitations".
+The next steps are in "Limitations" and in "How I would extend or improve the simulation".
 
 ## What the brief asks and where it is met
 
@@ -196,25 +196,99 @@ Add the new suffix to `JSON_TYPES` in `gui.py`. The run loop takes only `Paramet
 
 2-D motion: `State` holds vectors, each force returns a vector, `run` tests the height component, and `Trajectory`, `write_csv` and `plotting` get one column per component.
 
-## Many users, many purposes: problems to expect
-
-The brief asks me to imagine that many people use this code, from tennis balls to satellite re-entry.
-These are the problems I expect, each with my answer.
-
-* **Silent defaults.** A preset that omits a key gets the tennis ball value. A satellite preset without `fluid_density` runs in sea-level air, with no warning. Answer: make the physical inputs required, or log each default.
-* **Implicit units.** All values are bare SI numbers. A user who types 100 for a height of 100 km gets a valid but wrong run. Answer: state the units in the preset format, convert at the input boundary, and warn about implausible values.
-* **Constant density for re-entry.** The satellite preset uses 1e-5 kg/m^3 from 100 km to the ground, so it hits at 1386 m/s. That is not physical. The preset starts at rest. At impact, drag reaches only about 60 N against about 4.9 kN of weight. The run is close to free fall. Answer: add a `density(x)` drag class and keep the constant model as the default.
-* **1-D only, no time argument.** Real re-entry and tennis shots move mostly sideways. `Force.force` has no time argument, so wind gusts or thrust need a change to every force. Answer: move `State` to vectors and add `t` to the force signature while few forces exist.
-
 ## Limitations
 
-* Future work: an adaptive time step, a Mach-dependent CD and property-based tests.
-* The code does not handle R + x = 0 in the Newtonian model.
-* The impact time and velocity come from linear interpolation, so they are approximate.
-* Both integrators are explicit and have no step control. A time step above about 1 s gives wrong values for the tennis ball. Keep the step below about 0.5 s, or add an adaptive step.
-* A numeric preset value of `true` or `false` becomes 1 or 0. The loader casts with `float()` and does not reject booleans.
-* I ran the code only on Linux with Python 3.14. I did not run `start.bat` on Windows, and I did not run anything on macOS.
-* `requirements.txt` sets a minimum version for pytest only, so a future numpy or matplotlib release can break the code.
+The brief sets a simple model on purpose. This section lists what that model and my code cannot do.
+Each item has a matching answer, with the same bold name, in "How I would extend or improve the simulation".
+
+### Physics limitations of the brief's model
+
+* **Drag without the one-half factor.** The brief law `|FD| = CD rho v^2 pi r^2` has no one-half factor, so its CD is half of the usual `Cd` in `0.5 Cd rho v^2 A`. The tennis preset uses CD 0.5, a usual sphere value, so its drag is twice the real drag. Its terminal velocity `sqrt(m g / (CD rho pi r^2))` is 16.09 m/s against 22.76 m/s with the usual law, and the 100 m drop lasts 7.35 s against 5.99 s (rk4). A user who copies Cd from a textbook gets twice the drag with no warning.
+* **Constant fluid density.** One density applies from the start height to the ground. The satellite preset uses 1e-5 kg/m^3 from 100 km, so at impact the drag is 60 N against 4.9 kN of weight. It hits at 1386 m/s, close to the vacuum value of 1390.5 m/s, so the run is near free fall. Sea-level air (1.225 kg/m^3) is 122 500 times denser than the preset value. The preset demonstrates Newtonian gravity, not a real re-entry. With `rho = 1.225 exp(-x / 8500)`, the same body peaks at 857 m/s near 54 km and lands at 35.9 m/s (rk4, dt 0.01 s).
+* **Constant drag coefficient.** CD is one number for the whole run, with no change for Reynolds number, Mach number or rarefied air. The satellite preset hits at Mach 4.1 to 4.7 (`a = sqrt(1.4 * 287.05 * T)`, T from 216.65 K to 288.15 K), where shock waves change the drag. For a water droplet (1000 kg/m^3) of radius 10 micrometres with CD 0.5 in air (1.225 kg/m^3), the brief law gives 0.462 m/s. This speed is 38 times the Stokes value of 0.012 m/s (`2 (rho_p - rho_f) g r^2 / (9 mu)`, mu = 1.81e-5 Pa s). A tennis ball above about 44 m/s reaches Re 2e5 (`Re = rho v d / mu`, mu = 1.81e-5 Pa s). Re 2e5 is the start of the textbook drag crisis of a smooth sphere.
+* **Vertical motion only.** The state is one height and one velocity. There is no horizontal motion, lift, Magnus force from spin or crosswind. A real re-entry starts near orbital speed, `sqrt(G M / (R + h))` = 7848 m/s at 100 km. A drop from rest at 100 km misses about 97 % of that energy (kinetic 3.08e7 J/kg against potential 9.67e5 J/kg). `Force.force` also has no time argument, so wind gusts or thrust need a change to every force.
+* **No buoyancy and no added mass.** Only weight and drag act. In air, buoyancy on the tennis ball is 0.34 % of its weight (`rho_f V / m`, `V = 4/3 pi r^3`). In water it is 276 %, so a real ball floats, but the model sinks it at 0.563 m/s.
+* **Simple gravity models.** Constant g suits short drops: g changes by 3e-5 over the 100 m tennis drop but by 3.1 % over 100 km. The Newtonian model is a point mass that does not turn. It has no centrifugal term (0.034 m/s^2 at the equator, 0.35 % of g), no Coriolis drift and no oblateness. The inputs g = 9.81 m/s^2 and `G M / R^2` = 9.8195 m/s^2 are separate. Thus a change of model changes g by 0.1 % even near the ground, and the tennis impact time by 0.05 %.
+* **Rigid sphere of constant mass.** The ball has no spin, deformation, heating or mass loss. In a real re-entry, heating and ablation are the main physics. The satellite preset loses only 0.62 % of its energy to drag (3.0e6 J of 4.834e8 J), so it would barely heat.
+* **Flat ground and no bounce.** The run stops at the first x <= 0. A tennis ball bounces, but the model ends at the impact speed of 16.09 m/s. It has no terrain height.
+* **Still air.** Drag uses the ball velocity only. There is no wind, updraft, gust or turbulence. An updraft of 16.09 m/s would hold the tennis ball still, and the model cannot show this.
+* **Sphere only, so m, r and CD act as one group.** Without buoyancy, the motion depends only on gravity and the ballistic coefficient `beta = m / (CD pi r^2)`: 32.3 kg/m^2 for the tennis ball and 159.2 kg/m^2 for the satellite. Two bodies with the same beta give the same run, so a fit to data cannot find r or CD alone. A real satellite or capsule is not a sphere.
+
+### Numerical limitations
+
+* **Fixed step with no error control.** Both integrators use the step that the user sets, with no error estimate and no warning. The drag time scale `tau = v_t / g` is 1.64 s for the tennis ball and 0.047 s for the 10 micrometre droplet. At dt 2 s the simple scheme gives an impact speed of 10.21 m/s instead of 16.09 m/s. At dt 5 s rk4 reports an upward "impact" at +965 m/s. The summary line looks normal in both cases.
+* **Linear impact interpolation.** The run finds the impact on a straight line between the last two samples. For a 100 m drop in vacuum, the bound on the added impact-time error is `g dt^2 / (8 |v|)`. This bound is 2.8e-6 s at dt 0.01 s and 6.9e-3 s at dt 0.5 s. The measured error at dt 0.5 s is 7.8e-4 s.
+* **R + x = 0 not handled.** The brief says not to handle it, and the run stops at the ground. But rk4 trial states inside one step can go below the ground. An example is the satellite preset with R = 1 m, initial height 50 m, initial velocity -100 m/s, rk4 and dt 1 s. The speed overflows to inf, inf - inf gives nan, and the run ends airborne with a height of nan. Numpy gives only runtime warnings. The radius of the Earth makes this case unreachable in practice.
+* **Step cap and memory.** `validate` rejects more than 1e7 steps. `run` stores four float64 arrays sized by the finish time, not by the impact: 32 B per sample, about 320 MB at the cap. If the finish time is too short, the run ends in the air.
+* **No energy check per run.** Only the test suite checks accuracy. A user who runs new values gets no indicator of numerical error.
+
+### Many users and software
+
+* **Silent defaults.** A preset that omits a key gets the tennis ball value, with no warning. The satellite preset without `fluid_density` runs in sea-level air and is still at 89.5 km after 300 s.
+* **Implicit units.** All values are bare SI numbers. The satellite preset with `initial_height` 100, meant as 100 km, lands at 4.513 s and 44.314 m/s with no warning.
+* **No preset version.** Presets have no version field. A new key or a new default can change or break old presets, and there is no migration path.
+* **CSV without context.** The CSV holds only `t,x,v,a`. It has no parameters, units, integrator, time step or code version. Two runs with the same name write to the same file.
+* **Booleans read as numbers.** The loader casts with `float()`, so a preset value of `true` or `false` becomes 1 or 0.
+* **Unpinned requirements.** `requirements.txt` sets a minimum version for pytest only. A future numpy or matplotlib release can break the code. I tested with numpy 2.5.4 and matplotlib 3.11.2.
+* **One platform tested.** I ran the code only on Linux with Python 3.14.7. I did not run `start.bat` on Windows or anything on macOS. `start.py` accepts Python 3.10, which I did not test.
+* **No GUI test.** No automated test covers `ballsim/gui.py`. I tested it by hand on Linux.
+* **No CI.** The 45 tests run only by hand or through `start.py`. A change can break existing behaviour without notice.
+
+## How I would extend or improve the simulation
+
+The brief asks this question. I would work through the groups below in this order.
+Each bold name matches a limitation above. "How to extend" gives the code recipes.
+
+### Physics fidelity
+
+* **Drag without the one-half factor.** Pick one convention and label it. Add a conventional drag law with the 0.5 factor and keep the brief law under its own name. Tag each preset with `drag_convention`, so old presets keep their results. Show the convention next to CD in the GUI.
+* **Constant fluid density.** Add an atmosphere model with a `density(x)` method: constant (the default), exponential `rho0 exp(-x / H)`, and an interpolated table of the US Standard Atmosphere 1976. A preset key selects it, and a missing key means constant, so old presets keep their results. The same model gives the temperature for the speed of sound and the viscosity.
+* **Constant drag coefficient.** Make CD a function or table of Re and Mach, found each step from the speed, density, viscosity and speed of sound. Add a linear Stokes drag force `F = -6 pi mu r v` for Re below 1. Warn when a run leaves the valid range of Re, Mach or Knudsen number for the chosen law.
+* **Vertical motion only.** Move `State` to 2-D or 3-D vectors, as in the "2-D motion" recipe. Add the time t to `Force.force` now, while there are only three forces. Then add lift and Magnus forces, and initial conditions as a speed and a flight path angle.
+* **No buoyancy and no added mass.** Add a buoyancy force `rho_f V g` and an added mass of `0.5 rho_f V` for a sphere. Both are off by default. Warn when the fluid density is above 1 % of the ball density.
+* **Simple gravity models.** Set the default g from `G M / R^2`, or warn when the two differ. Add a rotating planet (centrifugal and Coriolis terms, with latitude) and J2 oblateness. Stop and report when an upward speed is above the escape speed `sqrt(2 G M / (R + x))`.
+* **Rigid sphere of constant mass.** Add mass, temperature and spin to `State`, so the integrator advances them. Add a stagnation heat flux (Sutton-Graves) and an ablation law `dm/dt = -q A / Q*`. `acceleration` then reads the mass from the state.
+* **Flat ground and no bounce.** Make the ground an event with a policy: stop (the default) or bounce with a coefficient of restitution. Add a ground height, and terrain once the state has vectors.
+* **Still air.** Add a wind field `w(x, t)` and compute drag from the relative velocity `v - w`. Model turbulence as a random `w(t)` with a seed in the preset, so runs repeat.
+* **Sphere only, so m, r and CD act as one group.** Add a body class with a reference area and a CD for each attitude, with the sphere as the default. Print beta in the summary and in the GUI, so users see the group that controls the run.
+
+### Numerics
+
+* **Fixed step with no error control.** Add an adaptive Runge-Kutta 4(5) integrator (Dormand-Prince) to `INTEGRATORS`, and keep the brief scheme as the default. First add a cheap guard: warn when dt is above 0.1 tau, when the speed passes 1.01 v_t, or when the impact velocity is upward. Add an implicit option for stiff cases such as Stokes drag.
+* **Linear impact interpolation.** For `simple`, solve the quadratic of the step for the exact crossing. For `rk4`, fit a cubic Hermite curve through x and v at both ends and find its root. A test then checks the vacuum impact against `sqrt(2 h / g)` to 1e-9 s at dt 0.5 s.
+* **R + x = 0 not handled.** Check that each new x, v and a is finite, and stop with an error that names the time. Make `NewtonianGravity` raise an error when R + x <= 0.
+* **Step cap and memory.** Store output at an interval that is separate from dt. Grow the arrays in chunks, so memory follows the impact time. Add a "run until impact" mode with a maximum time, and stream long runs to CSV.
+* **No energy check per run.** Move the energy balance from the animation prototype into the core. Print the residual `(E0 - (KE + PE + W_drag)) / E0` in each summary, warn above 1e-3 and add a CSV column. For the tennis ball with `simple`, the residual is 5.4e-4 at dt 0.01 s and 0.51 at dt 2 s.
+
+### Inputs, outputs and many users
+
+* **Silent defaults.** Make the physical inputs required. Keep defaults only for the time step and the integrator, or print one line for each default that a run uses.
+* **Implicit units.** Accept a value with a unit, such as `"100 km"`, in `from_dict` and convert it to SI there. Warn about values that are not plausible, such as constant g above 0.01 R or a time step above tau. Write the units into saved presets and the CSV header.
+* **No preset version.** Add `schema_version` to presets. `load_preset` migrates older versions through a small table of functions, and a missing version means 1.
+* **CSV without context.** Write a JSON file next to each CSV with the full parameters, the code version and the date. Add units to the column names, and add a run number when names repeat.
+* **Booleans read as numbers.** Reject `true` and `false` in numeric fields before `float()`, with an error that names the field.
+
+### Visualisation and usability
+
+The features below show the physics while a run plays.
+I prototyped these on a separate branch of my repository and left them out of this submission to keep it in scope.
+
+* **Animated ball with force arrows.** The ball moves on a height scale. A blue arrow shows drag and a red arrow shows weight, on one scale, so the two arrows match at terminal velocity.
+* **Growing graphs.** Height, velocity and acceleration graphs grow with time on fixed axes. A dashed line marks the terminal velocity.
+* **Gauges.** Bars show drag, weight and speed as a share of their run maximum. One bar splits the energy into kinetic, potential and lost to drag.
+* **Readout with terminal velocity and the energy balance.** A panel shows 13 values at the current time, with the local terminal velocity and the ratio of drag to weight. The energy balance checks the integrator with no reference solution: its maximum relative error is 5.37e-4 for the tennis ball and 8.76e-6 for the satellite. One module computes these values from the core force classes, so the viewer code holds no physics.
+* **Playback controls.** The viewer has pause and resume, restart, a stepped speed slider from x0.25 to x100, a time scrubber, and the space and r keys. Playback follows the wall clock, so a slow redraw does not slow the simulated time.
+* **Animate button.** One GUI button animates the current parameters in one window that it reuses. The GUI imports the viewer only when you press the button, so the core runs without it. `python -m extras.animate` gives the same view from the command line.
+
+### Process and tooling
+
+* **No CI.** Run GitHub Actions on each push. A change must pass before merge.
+* **One platform tested.** Run the CI jobs on Linux, Windows and macOS with Python 3.10 and the latest Python. Each job runs pytest and `start.py --no-gui`. The Windows job also runs `start.bat --no-gui`.
+* **Unpinned requirements.** Keep version ranges in `requirements.txt` and add a constraints file with the tested set (numpy 2.5.4, matplotlib 3.11.2, pytest 9.2.0). Add one CI job on the minimum versions.
+* **Regression baselines.** Store the impact time and speed of each preset (7.348 s and 16.088 m/s, 144.732 s and 1386.184 m/s). A test fails when a change moves them beyond a set tolerance. This protects existing users when I add features.
+* **Property-based tests.** Generate random valid inputs and check rules that must always hold. Drag opposes motion. With constant g and a small time step, a drop from rest never passes terminal velocity. The energy residual stays small.
+* **No GUI test.** Add a headless smoke test under xvfb that fills the fields, runs, and checks the status text and the plot lines.
+* **Packaging.** Add a `[project]` section and a `ballsim` script entry to the existing `pyproject.toml`. Then users can install the package with pip and import it in their own scripts.
 
 ## How this was built
 
