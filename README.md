@@ -57,7 +57,7 @@ The next steps are in "Many users, many purposes: problems to expect" and in "Li
 
 ## What the brief asks and where it is met
 
-Test names are in `tests/` unless the path says otherwise.
+Test names are in `tests/`.
 
 | Brief requirement | Where in the code | Test that proves it |
 |:--|:--|:--|
@@ -212,16 +212,16 @@ These are the problems I expect, each with my answer.
 * The code does not handle R + x = 0 in the Newtonian model.
 * The impact time and velocity come from linear interpolation, so they are approximate.
 * Both integrators are explicit and have no step control. A time step above about 1 s gives wrong values for the tennis ball. Keep the step below about 0.5 s, or add an adaptive step.
-* A preset value of `true` or `false` becomes 1 or 0. The loader casts with `float()` and does not reject booleans.
+* A numeric preset value of `true` or `false` becomes 1 or 0. The loader casts with `float()` and does not reject booleans.
 * I ran the code only on Linux with Python 3.14. I did not run `start.bat` on Windows, and I did not run anything on macOS.
 * `requirements.txt` sets a minimum version for pytest only, so a future numpy or matplotlib release can break the code.
 
 ## How this was built
 
-I read the brief and settled the design in structured question sessions. I made every decision in those sessions.
+I read the brief and settled the design in structured question sessions. I made the design decisions in those sessions.
 AI coding assistants (Claude Code) wrote the code and the tests from those decisions.
-The work was test first. A separate AI reviewer checked each task against the plan before the commit.
-An independent AI review panel then reviewed the core. Two sceptical verifiers tested each serious finding, and I corrected the findings that held.
+Each change came with its tests. A separate AI reviewer checked each task against the plan before the commit.
+An independent AI review panel then reviewed the core. Two sceptical verifiers tested each serious finding, and AI builders corrected the findings that held.
 I tested the GUI by hand on Linux. I am responsible for every line, and I expect to walk through it at the interview.
 
 ## What this archive contains
