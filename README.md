@@ -43,10 +43,10 @@ Paths are relative to this folder.
 * `ballsim/parameters.py`: `Ball`, `State`, `Parameters`, `validate`, and the name lists `GRAVITY_MODELS` and `INTEGRATOR_NAMES`.
 * `ballsim/forces.py`: `Force` and its subclasses `ConstantGravity`, `NewtonianGravity` and `QuadraticDrag`.
 * `ballsim/integrators.py`: `simple_step`, `rk4_step` and the `INTEGRATORS` dictionary.
-* `ballsim/simulation.py`: `make_forces`, `acceleration`, `run`, `describe` and the `Trajectory` class.
+* `ballsim/simulation.py`: `make_forces`, `acceleration`, `run`, `describe`, `write_csv` and the `Trajectory` class.
 * `ballsim/presets.py`: `from_dict`, `load_preset` and `save_preset`.
 * `ballsim/plotting.py`: `make_axes` and `add_trajectory`. It uses `Figure` and not pyplot, so the GUI can embed it.
-* `ballsim/__main__.py`: the command line, `write_csv` and `csv_path`.
+* `ballsim/__main__.py`: the command line and `csv_path`.
 * `ballsim/gui.py`: the Tk window.
 * `tests/`: the tests.
 * `presets/`: the tennis ball and satellite re-entry presets.
@@ -68,7 +68,7 @@ Test names are in `tests/`.
 | `FW + FD = m a` | `simulation.py`, `acceleration` | `test_simulation.py::test_free_fall_matches_closed_form`, `test_terminal_velocity`, `test_rk4_more_accurate_and_both_converge` |
 | Forces at time t from the current x and v, then numerical integration | `run` passes `accel(state)` to the integrator | `test_integrators.py::test_simple_step_matches_brief_formula` |
 | The brief scheme, plus a built-in alternative | `integrators.py`, `simple_step` and `rk4_step` | `test_simple_step_matches_brief_formula`, `test_rk4_accurate_on_spring`, `test_simulation.py::test_rk4_more_accurate_and_both_converge` |
-| Calculate x, v and a | `Trajectory`, CSV columns `t,x,v,a`, three plot panels | `test_cli.py::test_cli_prints_summary_and_csv`, `test_simulation.py::test_free_fall_matches_closed_form` |
+| Calculate x, v and a | `Trajectory`, CSV columns `t,x,v,a` (also the GUI Save CSV button), three plot panels | `test_cli.py::test_cli_prints_summary_and_csv`, `test_simulation.py::test_free_fall_matches_closed_form` |
 | User varies CD, rho, r, m, g, G, M, R, initial height and velocity, finish time, time step | `Parameters` and `validate`, one preset key and one GUI entry each | `test_presets.py::test_invalid_field_named`, `test_newtonian_needs_positive_planet` |
 | Model valid for x > 0, x = 0 is impact, R + x = 0 not handled | `run` stops at the first x <= 0 and interpolates to x = 0. `validate` requires a positive initial height | `test_simulation.py::test_impact_time_interpolated` |
 | Tests and visualisations | `ballsim/plotting.py`, `ballsim/gui.py` | 45 tests in total, `test_plotting.py::test_plot_smoke` |
@@ -149,6 +149,7 @@ Options:
 
 In the GUI window, edit the parameters, load or save a preset, and press Run.
 Each run adds to the plots. Clear them with Clear plots, or untick Keep previous runs.
+Save CSV writes the last run to a file with the columns `t,x,v,a`.
 
 ## Preset format
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 
@@ -109,3 +110,9 @@ def describe(trajectory: Trajectory) -> str:
         f"{trajectory.name}: airborne at finish time t = {trajectory.t[-1]:.3f} s, "
         f"height {trajectory.x[-1]:.3f} m, max speed {max_speed:.3f} m/s"
     )
+
+
+def write_csv(trajectory: Trajectory, path: Path) -> None:
+    """Save the trajectory as t,x,v,a columns."""
+    data = np.column_stack([trajectory.t, trajectory.x, trajectory.v, trajectory.a])
+    np.savetxt(path, data, delimiter=",", header="t,x,v,a", comments="")

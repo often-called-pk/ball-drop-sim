@@ -5,18 +5,10 @@ import argparse
 from dataclasses import replace
 from pathlib import Path
 
-import numpy as np
-
 from ballsim.parameters import INTEGRATOR_NAMES
 from ballsim.plotting import add_trajectory, make_axes
 from ballsim.presets import load_preset
-from ballsim.simulation import Trajectory, describe, run
-
-
-def write_csv(trajectory: Trajectory, path: Path) -> None:
-    """Save the trajectory as t,x,v,a columns."""
-    data = np.column_stack([trajectory.t, trajectory.x, trajectory.v, trajectory.a])
-    np.savetxt(path, data, delimiter=",", header="t,x,v,a", comments="")
+from ballsim.simulation import Trajectory, describe, run, write_csv
 
 
 def csv_path(base: Path, trajectory: Trajectory, several: bool) -> Path:

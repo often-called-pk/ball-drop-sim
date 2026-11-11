@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from dataclasses import fields
+from pathlib import Path
 from tkinter import filedialog, ttk
 
 from matplotlib.axes import Axes
@@ -12,10 +13,11 @@ from matplotlib.figure import Figure
 from ballsim.parameters import GRAVITY_MODELS, INTEGRATOR_NAMES, Parameters
 from ballsim.plotting import add_trajectory, make_axes
 from ballsim.presets import from_dict, load_preset, save_preset
-from ballsim.simulation import describe, run as run_simulation
+from ballsim.simulation import Trajectory, describe, run as run_simulation, write_csv
 
 CHOICES = {"gravity_model": GRAVITY_MODELS, "integrator": INTEGRATOR_NAMES}
 JSON_TYPES = [("Preset", "*.json")]
+CSV_TYPES = [("CSV", "*.csv")]
 UNITS = {
     "mass": "kg", "radius": "m", "fluid_density": "kg/m^3", "g": "m/s^2",
     "G": "m^3/(kg s^2)", "M": "kg", "R": "m", "initial_height": "m",
@@ -31,6 +33,7 @@ class App:
         self.fig: Figure | None = None
         self.canvas: FigureCanvasTkAgg | None = None
         self.axes: list[Axes] = []
+        self.last_trajectory: Trajectory | None = None
 
         form = ttk.Frame(root, padding=8)
         form.pack()
@@ -54,6 +57,7 @@ class App:
         buttons.pack()
         ttk.Button(buttons, text="Load preset", command=self.load).pack(side="left")
         ttk.Button(buttons, text="Save preset", command=self.save).pack(side="left")
+        ttk.Button(buttons, text="Save CSV", command=self.save_csv).pack(side="left")
         ttk.Button(buttons, text="Run", command=self.run).pack(side="left")
         ttk.Button(buttons, text="Clear plots", command=self.clear).pack(side="left")
 
@@ -98,6 +102,25 @@ class App:
             return
         self.status.set(f"Saved {path}")
 
+    def save_csv(self) -> None:
+        """Write the last run to a CSV file with the columns t,x,v,a."""
+        trajectory = self.last_trajectory
+        if trajectory is None:
+            self.status.set("Press Run first, then Save CSV.")
+            return
+        path = filedialog.asksaveasfilename(
+            filetypes=CSV_TYPES, defaultextension=".csv",
+            initialfile=trajectory.name.replace(" ", "_") + ".csv",
+        )
+        if not path:
+            return
+        try:
+            write_csv(trajectory, Path(path))
+        except OSError as error:
+            self.status.set(str(error))
+            return
+        self.status.set(f"Saved {trajectory.name} to {path}")
+
     def plot_window_axes(self) -> list[Axes]:
         """Return the plot axes. Open the plot window first if it is missing or closed."""
         if self.window is None or not self.window.winfo_exists():
@@ -116,6 +139,7 @@ class App:
         except ValueError as error:
             self.status.set(str(error))
             return
+        self.last_trajectory = trajectory
         if not self.keep.get():
             self.clear()
         add_trajectory(self.plot_window_axes(), trajectory)
