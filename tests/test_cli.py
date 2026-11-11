@@ -15,6 +15,7 @@ def test_cli_prints_summary_and_csv(tmp_path, capsys):
     assert "impact" in capsys.readouterr().out
     lines = out.read_text().splitlines()
     assert lines[0] == "t,x,v,a"
+    assert lines[2] == "0.01,99.9995,-0.0981,-9.80964"  # 6 significant figures
     assert len(lines) - 1 > 10
 
 

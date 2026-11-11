@@ -145,11 +145,11 @@ Options:
 
 * `--integrator {simple,rk4}` replaces the integrator in every preset.
 * `--no-plot` skips the plot window.
-* `--csv PATH` writes each trajectory to a CSV file with the columns `t,x,v,a`. With several runs, the program adds the run name to the file name, for example `out_tennis_ball.csv`.
+* `--csv PATH` writes each trajectory to a CSV file with the columns `t,x,v,a`, to 6 significant figures (`%.6g`). With several runs, the program adds the run name to the file name, for example `out_tennis_ball.csv`.
 
 In the GUI window, edit the parameters, load or save a preset, and press Run.
 Each run adds to the plots. Clear them with Clear plots, or untick Keep previous runs.
-Save CSV writes the last run to a file with the columns `t,x,v,a`.
+Save CSV writes the last run to a file with the columns `t,x,v,a`, in the same format as `--csv`.
 
 ## Preset format
 

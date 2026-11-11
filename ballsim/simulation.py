@@ -113,6 +113,6 @@ def describe(trajectory: Trajectory) -> str:
 
 
 def write_csv(trajectory: Trajectory, path: Path) -> None:
-    """Save the trajectory as t,x,v,a columns."""
+    """Save the trajectory as t,x,v,a columns, 6 significant figures so the file stays readable."""
     data = np.column_stack([trajectory.t, trajectory.x, trajectory.v, trajectory.a])
-    np.savetxt(path, data, delimiter=",", header="t,x,v,a", comments="")
+    np.savetxt(path, data, delimiter=",", header="t,x,v,a", comments="", fmt="%.6g")
