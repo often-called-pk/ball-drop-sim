@@ -8,7 +8,7 @@ It needs Python 3.10 or newer, numpy and matplotlib.
 
 The plot overlays the two shipped presets.
 The satellite falls at 35 to 36 m/s for most of its 2824 s run, so its height curve is almost a straight line.
-On shared axes the tennis ball run (100 m, about 7 s) is a short line near t = 0 in each panel.
+On these shared axes the tennis ball run (100 m, about 7 s) is almost invisible near t = 0. Run it alone to see its curves.
 
 ## Quick start
 
