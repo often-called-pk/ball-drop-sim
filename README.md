@@ -1,14 +1,16 @@
 # Ball drop simulation
 
 This program simulates a ball that falls in one dimension under gravity and quadratic drag.
-It answers the TOYOTA Racing coding challenge for a Simulation Engineer.
 It needs Python 3.10 or newer, numpy and matplotlib.
 
-![Height, velocity and acceleration of the tennis ball and the satellite re-entry presets on shared axes](docs/plot_overlay.png)
+An optional animation in `extras/` replays a run with force arrows, live graphs, gauges and a readout.
+Three sections near the end cover the problems with many users, the work I would do with more time, and the limitations.
 
-The plot overlays the two shipped presets.
-On shared axes the tennis ball (100 m, about 7 s) is a flat line near zero in the height and velocity panels.
-Its curve is clear only in the acceleration panel.
+![The GUI form with the tennis ball preset after a run](docs/gui.png)
+
+![Height, velocity and acceleration of the tennis ball preset](docs/plot_tennis_ball.png)
+
+The tennis ball reaches its terminal velocity of 16.09 m/s and its acceleration falls to almost zero before it lands at 7.35 s.
 
 `CONTEXT.md` defines the terms in this file (run, preset, trajectory and so on).
 
@@ -48,14 +50,13 @@ Paths are relative to this folder. Test names are in `tests/` unless the path sa
 | Tests and visualisations | `tests/`, `extras/tests/`, `ballsim/plotting.py`, `ballsim/gui.py`, `extras/animate.py` | 83 tests in total, `test_plotting.py::test_plot_smoke`, `extras/tests/test_animate.py` |
 | Easy to extend, easy to change the input format | `Force` base class, `INTEGRATORS`, `make_forces`, `load_preset` | `test_integrators.py::test_names_match_parameters`, `test_presets.py::test_round_trip`, `test_unknown_key_rejected` |
 | Instructions to compile, run and test | This file, `start.py` | `test_cli.py` (the start scripts have no automated test) |
-| One zip named with first and last name | `PrashantKumar.zip`, see the last section | None |
 
 No test checks a negative G or M. `validate` rejects them, but only in the Newtonian model.
 
 ## Scope
 
 The core answers the brief: `ballsim/`, `tests/` and `presets/`.
-`extras/` is an optional animation. I added it after the core was complete, and the core did not change for it.
+`extras/` is an optional animation. I added it after the core was complete. Its only change to the core is the Animate button in `ballsim/gui.py`.
 `start.py`, `start.sh` and `start.bat` are a convenience for setup.
 
 Suggested reading order for the core:
@@ -274,7 +275,7 @@ New gravity model:
 2. Add one branch for it in `make_forces` in `simulation.py`.
 3. Add its name to `GRAVITY_MODELS` in `parameters.py`.
 4. Add the parameters it needs to `Parameters` and `validate`.
-5. Add a unit label for each new parameter to `UNITS` in `gui.py`.
+5. Add a label with its symbol and unit for each new parameter to `LABELS` in `gui.py`.
 6. Add its potential energy to `potential_energy` in `extras/quantities.py`. If you do not, Animate fails for the new model.
 
 New atmosphere: write a new drag class that finds the density from a `density(x)` method.
@@ -314,7 +315,7 @@ These are the problems I expect, each with my answer.
 * **One fixed step for all regimes.** Neither integrator controls its error. For the tennis ball, `simple` at dt = 2 s gives -10.2 m/s at impact against about -16.1 m/s. `rk4` at dt = 5 s reports an upward impact at +965 m/s. No warning appears. Answer: add an adaptive integrator with an impact event, and warn when dt is large against the time scale `v_terminal / g`.
 * **The ten-million-step cap.** `validate` rejects runs with more than 1e7 steps, so a one-day decay at dt = 0.001 s fails. `run` also allocates memory for every possible step, even when impact comes early. Answer: use adaptive steps, keep every k-th sample, or stream samples to disk. Make the cap a documented setting.
 * **CSV files without a source.** `write_csv` writes only `t,x,v,a`, with no parameters, units or code version. Another team cannot reproduce the run. Answer: write the preset as a JSON file next to each CSV, and add the git hash and units to the header.
-* **Shared plot axes.** Overlaid runs of different scale hide the small run, as the image at the top shows. Answer: offer one figure per run, normalised axes or log scales, chosen by a command-line flag.
+* **Shared plot axes.** Overlaid runs of different scale hide the small run, as `docs/plot_overlay.png` shows. Answer: offer one figure per run, normalised axes or log scales, chosen by a command-line flag.
 * **A new gravity model touches many files.** It needs edits in six places (see How to extend). If `potential_energy` is not updated, Animate fails although `run` works. Answer: register each model in one place, with its class, parameters and potential energy. Add a test that runs every model in `GRAVITY_MODELS` through `run` and `compute`.
 * **1-D only, no time argument.** Real re-entry and tennis shots move mostly sideways. `validate` rejects a start from the ground, because the initial height must be above zero. `Force.force` has no time argument, so wind gusts or thrust need a change to every force. Answer: move `State` to vectors. Add `t` to the force signature now, while few forces exist. Allow x = 0 with v > 0 at the start.
 
@@ -341,58 +342,9 @@ These are the problems I expect, each with my answer.
 
 ## How this was built
 
-I read the brief and settled the design in structured question sessions. I made every decision in those sessions.
-The core took 12 decisions: scope, ground handling, integrators, force structure, inputs, GUI toolkit, plots, tests, presets, packaging, numerics and code style.
-The animation took 22 more decisions, plus the set-up of the repository.
-
-Before any code, an AI assistant recorded each decision.
-The glossary is in `CONTEXT.md`. The implementation plans are not in this archive.
-
+I read the brief and settled the design in structured question sessions. I made the design decisions in those sessions.
 AI coding assistants (Claude Code) wrote the code and the tests from those decisions.
-The work was test first. Each task started with a failing test, then the smallest code that made it pass.
-A separate AI reviewer checked every task against the plan before the commit.
-Its findings were fixed before the commit.
-
-After the core was complete, an independent review panel examined it through six lenses.
-The lenses were brief compliance, physics and numerics, readability, extensibility, tests and documentation.
-The panel raised 46 findings. Two sceptical verifiers checked each serious finding.
-They confirmed 16 findings, and all 16 were fixed. Four examples:
-
-* A bare `pytest` command could not import the package.
-* The run loop had dead lines.
-* Nothing limited the number of steps.
-* This README had a wrong statement about large time steps. It now gives the measured values.
-
-For the animation, a reviewer measured playback on a real screen.
-It ran at about a quarter of the labelled speed, because each full redraw takes about 0.13 s.
-The fix advances the animation time by the elapsed wall-clock time.
-The same review measured the idle CPU load during a pause, and the fix removed it.
-
-I tested the GUI and the animation by hand on Linux.
-The core is one commit on `main`. The animation is on its own branch, with one commit per task.
-The history is in a private GitHub repository and is available on request.
-I am responsible for every line, and I expect to walk through it at the interview.
-
-## What this archive contains
-
-```
-PrashantKumar/
-  README.md, CONTEXT.md            this guide and the glossary
-  ballsim/                         the simulation package (the core)
-  tests/                           the core tests (48)
-  presets/                         the tennis ball and satellite re-entry presets
-  extras/                          the optional animation and its tests (35)
-  docs/                            the two images in this README
-  start.py, start.sh, start.bat    the one-command setup
-  requirements.txt, pyproject.toml the dependencies and the pytest settings
-  .gitattributes, .gitignore       line-ending and ignore rules
-```
-
-I built the archive with this command:
-
-```
-git archive --format=zip --prefix=PrashantKumar/ -o PrashantKumar.zip HEAD
-```
-
-So it holds exactly the version-controlled files.
-It holds no virtual environment, no caches and no git history.
+A separate AI reviewer checked each task against the plan before the commit.
+An independent AI review panel then reviewed the core. Two sceptical verifiers tested each serious finding, and AI builders fixed the findings that held.
+For the animation, a reviewer measured playback on a real screen. It ran at about a quarter of the labelled speed, because each full redraw takes about 0.13 s. The fix advances the animation time by the elapsed wall-clock time.
+I tested the GUI and the animation by hand on Linux. I am responsible for every line.
