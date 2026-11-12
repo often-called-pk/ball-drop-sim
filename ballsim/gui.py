@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from dataclasses import fields
+from pathlib import Path
 from tkinter import filedialog, ttk
 
 from matplotlib.axes import Axes
@@ -16,6 +17,8 @@ from ballsim.simulation import describe, run as run_simulation
 
 CHOICES = {"gravity_model": GRAVITY_MODELS, "integrator": INTEGRATOR_NAMES}
 JSON_TYPES = [("Preset", "*.json")]
+# Without initialdir, Windows file dialogs open in Documents. Start them where the program runs.
+START_DIR = Path.cwd()
 # Tk labels cannot format text, so units use Unicode superscript and subscript characters.
 LABELS = {
     "name": "Name",
@@ -100,7 +103,7 @@ class App:
         return Parameters(**values)
 
     def load(self) -> None:
-        path = filedialog.askopenfilename(filetypes=JSON_TYPES)
+        path = filedialog.askopenfilename(filetypes=JSON_TYPES, initialdir=START_DIR)
         if not path:
             return
         try:
@@ -117,7 +120,9 @@ class App:
         except ValueError as error:
             self.status.set(str(error))
             return
-        path = filedialog.asksaveasfilename(filetypes=JSON_TYPES, defaultextension=".json")
+        path = filedialog.asksaveasfilename(
+            filetypes=JSON_TYPES, defaultextension=".json", initialdir=START_DIR,
+        )
         if not path:
             return
         try:
