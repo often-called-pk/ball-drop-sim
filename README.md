@@ -1,6 +1,6 @@
 # Ball drop simulation
 
-This program simulates a ball that falls in one dimension under gravity and quadratic drag. This is an extension of the challenge provided by TGR. Since you are here, I expect that you have finished reading the complete README.md in my submission older, and were interested in how I could have extended this simulation or added features to it if was provided with more time. 
+This program simulates a ball that falls in one dimension under gravity and quadratic drag. This is an extension of the challenge provided by TGR. Since you are here, I expect that you have finished reading the complete README.md in my submission folder, and were interested in how I could have extended this simulation or added features to it if I was provided with more time.
 
 An optional animation in `extras/` replays a run with force arrows, live graphs, gauges and a readout.
 Three sections near the end cover the problems with many users, the work I would do with more time, and the limitations.
