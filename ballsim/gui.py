@@ -18,6 +18,8 @@ from ballsim.simulation import Trajectory, describe, run as run_simulation, writ
 CHOICES = {"gravity_model": GRAVITY_MODELS, "integrator": INTEGRATOR_NAMES}
 JSON_TYPES = [("Preset", "*.json")]
 CSV_TYPES = [("CSV", "*.csv")]
+# Without initialdir, Windows file dialogs open in Documents. Start them where the program runs.
+START_DIR = Path.cwd()
 # Tk labels cannot format text, so units use Unicode superscript and subscript characters.
 LABELS = {
     "name": "Name",
@@ -89,7 +91,7 @@ class App:
         return from_dict({name: var.get() for name, var in self.vars.items()})
 
     def load(self) -> None:
-        path = filedialog.askopenfilename(filetypes=JSON_TYPES)
+        path = filedialog.askopenfilename(filetypes=JSON_TYPES, initialdir=START_DIR)
         if not path:
             return
         try:
@@ -105,7 +107,9 @@ class App:
         except ValueError as error:
             self.status.set(str(error))
             return
-        path = filedialog.asksaveasfilename(filetypes=JSON_TYPES, defaultextension=".json")
+        path = filedialog.asksaveasfilename(
+            filetypes=JSON_TYPES, defaultextension=".json", initialdir=START_DIR,
+        )
         if not path:
             return
         try:
@@ -122,7 +126,7 @@ class App:
             self.status.set("Press Run first, then Save CSV.")
             return
         path = filedialog.asksaveasfilename(
-            filetypes=CSV_TYPES, defaultextension=".csv",
+            filetypes=CSV_TYPES, defaultextension=".csv", initialdir=START_DIR,
             initialfile=trajectory.name.replace(" ", "_") + ".csv",
         )
         if not path:
