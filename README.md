@@ -1,10 +1,11 @@
 # Ball drop simulation
 
-This program simulates a ball that falls in one dimension under gravity and quadratic drag.
-It needs Python 3.10 or newer, numpy and matplotlib.
+This program simulates a ball that falls in one dimension under gravity and quadratic drag. This is an extension of the challenge provided by TGR. Since you are here, I expect that you have finished reading the complete README.md in my submission older, and were interested in how I could have extended this simulation or added features to it if was provided with more time. 
 
 An optional animation in `extras/` replays a run with force arrows, live graphs, gauges and a readout.
 Three sections near the end cover the problems with many users, the work I would do with more time, and the limitations.
+
+It needs Python 3.10 or newer, numpy and matplotlib.
 
 ![The GUI form with the tennis ball preset after a run](docs/gui.png)
 
@@ -250,8 +251,6 @@ How the tests show that the physics is correct:
 * Integrator convergence: against the `tanh` solution for drag and constant gravity, both errors fall when dt halves, and rk4 is always more accurate.
 * Energy balance (extra): without drag, the energy stays constant to 1e-9 of the start energy before impact. With drag, kinetic plus potential plus energy lost to drag stays within 1e-3 of the start energy.
 
-The GUI has no automated test. I tested it by hand.
-
 ## Module map
 
 * `ballsim/parameters.py`: `Ball`, `State`, `Parameters`, `validate`, and the name lists `GRAVITY_MODELS` and `INTEGRATOR_NAMES`.
@@ -303,10 +302,7 @@ The run loop takes only `Parameters`, so a new format does not change the simula
 3. `Trajectory` and `write_csv` get one column per component.
 4. `plotting` picks the components to draw.
 
-## Many users, many purposes: problems to expect
-
-The brief asks me to imagine that many people use this code, from tennis balls to satellite re-entry.
-These are the problems I expect, each with my answer.
+## Expected Problems
 
 * **Silent defaults.** A preset that omits a key gets the tennis ball value. A satellite preset without `fluid_density` runs in sea-level air, with no warning. Answer: make the physical inputs required, or log each default that the loader uses.
 * **Preset versions.** `load_preset` rejects unknown keys, and `save_preset` writes no version. A preset from a newer build fails on an older build, and a renamed field breaks every saved preset. Answer: add a `schema_version` key and a small migration step in `load_preset`.
