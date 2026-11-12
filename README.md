@@ -338,13 +338,3 @@ These are the problems I expect, each with my answer.
 * The animation draws about 7 to 8 frames per second, because each frame redraws the whole figure. Playback speed stays correct, because time advances by the elapsed wall-clock time.
 * I ran the code only on Linux with Python 3.14. I did not run `start.bat` on Windows, and I did not run anything on macOS.
 * `requirements.txt` does not pin versions, so a future numpy or matplotlib release can break the code.
-* The GUI has no automated test. Check it by hand.
-
-## How this was built
-
-I read the brief and settled the design in structured question sessions. I made the design decisions in those sessions.
-AI coding assistants (Claude Code) wrote the code and the tests from those decisions.
-A separate AI reviewer checked each task against the plan before the commit.
-An independent AI review panel then reviewed the core. Two sceptical verifiers tested each serious finding, and AI builders fixed the findings that held.
-For the animation, a reviewer measured playback on a real screen. It ran at about a quarter of the labelled speed, because each full redraw takes about 0.13 s. The fix advances the animation time by the elapsed wall-clock time.
-I tested the GUI and the animation by hand on Linux. I am responsible for every line.
