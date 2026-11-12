@@ -10,10 +10,10 @@ from ballsim.simulation import Trajectory
 def make_axes(fig: Figure) -> list[Axes]:
     """Three stacked plots (height, velocity, acceleration) that share the time axis."""
     axes = list(fig.subplots(3, 1, sharex=True))
-    axes[0].set_ylabel("Height x [m]")
-    axes[1].set_ylabel("Velocity v [m/s]")
-    axes[2].set_ylabel("Acceleration a [m/s^2]")
-    axes[2].set_xlabel("Time t [s]")
+    axes[0].set_ylabel("Height $x$ (m)")
+    axes[1].set_ylabel("Velocity $v$ (m/s)")
+    axes[2].set_ylabel("Acceleration $a$ (m/s$^2$)")
+    axes[2].set_xlabel("Time $t$ (s)")
     return axes
 
 

@@ -16,10 +16,23 @@ from ballsim.simulation import describe, run as run_simulation
 
 CHOICES = {"gravity_model": GRAVITY_MODELS, "integrator": INTEGRATOR_NAMES}
 JSON_TYPES = [("Preset", "*.json")]
-UNITS = {
-    "mass": "kg", "radius": "m", "fluid_density": "kg/m^3", "g": "m/s^2",
-    "G": "m^3/(kg s^2)", "M": "kg", "R": "m", "initial_height": "m",
-    "initial_velocity": "m/s", "finish_time": "s", "time_step": "s",
+# Tk labels cannot format text, so units use Unicode superscript and subscript characters.
+LABELS = {
+    "name": "Name",
+    "mass": "Mass  m  (kg)",
+    "radius": "Radius  r  (m)",
+    "drag_coefficient": "Drag coefficient  Cd",
+    "fluid_density": "Fluid density  ρ  (kg/m³)",
+    "gravity_model": "Gravity model",
+    "g": "Gravity  g  (m/s²)",
+    "G": "Gravitational constant  G  (m³ kg⁻¹ s⁻²)",
+    "M": "Planet mass  M  (kg)",
+    "R": "Planet radius  R  (m)",
+    "initial_height": "Initial height  x₀  (m)",
+    "initial_velocity": "Initial velocity  v₀  (m/s)",
+    "finish_time": "Finish time  (s)",
+    "time_step": "Time step  Δt  (s)",
+    "integrator": "Integrator",
 }
 
 
@@ -42,7 +55,7 @@ class App:
         for row, field in enumerate(fields(Parameters)):
             var = tk.StringVar()
             self.vars[field.name] = var
-            text = f"{field.name} [{UNITS[field.name]}]" if field.name in UNITS else field.name
+            text = LABELS.get(field.name, field.name)
             ttk.Label(form, text=text).grid(row=row, column=0, sticky="w")
             if field.name in CHOICES:
                 widget = ttk.Combobox(

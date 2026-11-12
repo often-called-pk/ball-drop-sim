@@ -56,7 +56,7 @@ def format_readout(values: dict[str, float]) -> str:
         f"t  {v['t']:8.2f} s",
         f"height        {v['x']:10.4g} m",
         f"velocity      {v['v']:10.4g} m/s",
-        f"acceleration  {v['a']:10.4g} m/s^2",
+        f"acceleration  {v['a']:10.4g} m/s²",
         f"drag          {v['drag']:10.4g} N",
         f"weight        {v['weight']:10.4g} N",
         f"net           {v['net']:10.4g} N",
@@ -126,7 +126,7 @@ class Animator:
         ax.set_xticks([])
         ax.set_yticks([t for t in ax.get_yticks() if t >= 0])  # no tick labels inside the ground band
         ax.set_ylim(-0.2 * self.top, self.top)
-        ax.set_ylabel("Height [m]")
+        ax.set_ylabel("Height $x$ (m)")
         ax.axhspan(-0.2 * self.top, 0, color="0.85")
         ax.axhline(0, color="black", linewidth=2)
         ax.text(0.55, -0.1 * self.top, "ground", ha="center", va="center", fontsize=8)
@@ -157,9 +157,9 @@ class Animator:
         has_terminal = not np.all(np.isnan(q.terminal_speed))  # no drag gives all nan
         velocity_limits = [traj.v]
         specs = [
-            ("Height [m]", traj.x, [traj.x]),
-            ("Velocity [m/s]", traj.v, velocity_limits),
-            ("Acceleration [m/s^2]", traj.a, [traj.a]),
+            ("Height $x$ (m)", traj.x, [traj.x]),
+            ("Velocity $v$ (m/s)", traj.v, velocity_limits),
+            ("Acceleration $a$ (m/s$^2$)", traj.a, [traj.a]),
         ]
         self.graph_data = [data for _, data, _ in specs]
         self.graph_lines, self.graph_dots = [], []
@@ -175,7 +175,7 @@ class Animator:
             self.graph_dots.append(ax.plot([], [], "o", color="tab:red")[0])
             if row < 2:
                 ax.tick_params(labelbottom=False)
-        ax.set_xlabel("Time [s]")
+        ax.set_xlabel("Time $t$ (s)")
         vel_ax = self.graph_lines[1].axes
         # skip the terminal line when it lies off the velocity scale, the readout still shows it
         if has_terminal and np.nanmin(-q.terminal_speed) >= vel_ax.get_ylim()[0]:
