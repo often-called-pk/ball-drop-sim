@@ -1,7 +1,6 @@
 # Ball drop simulation
 
 This program simulates a ball that falls in one dimension under gravity and quadratic drag.
-It answers the TOYOTA Racing coding challenge for a Simulation Engineer.
 It needs Python 3.10 or newer, numpy and matplotlib.
 
 ![The GUI form with the tennis ball preset after a run](docs/gui.png)
@@ -195,3 +194,6 @@ Call it where the program loads a file: `main` in `ballsim/__main__.py` and `App
 Add the new suffix to `JSON_TYPES` in `gui.py`. The run loop takes only `Parameters`, so a new format does not change the simulation.
 
 2-D motion: `State` holds vectors, each force returns a vector, `run` tests the height component, and `Trajectory`, `write_csv` and `plotting` get one column per component.
+
+I have addressed the improvements that I could have done if I was given a 3-4 hours time horizon for the development of this simulation tool here on my GitHub page.
+Do check it out if interested - https://github.com/often-called-pk/ball-drop-sim/tree/main
