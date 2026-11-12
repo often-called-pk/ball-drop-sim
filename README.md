@@ -185,7 +185,7 @@ New gravity model:
 2. Add one branch for it in `make_forces` in `simulation.py`.
 3. Add its name to `GRAVITY_MODELS` in `parameters.py`.
 4. Add the parameters it needs to `Parameters` and `validate`.
-5. Add a unit label for each new parameter to `UNITS` in `gui.py`.
+5. Add a label with its symbol and unit for each new parameter to `LABELS` in `gui.py`.
 
 New atmosphere: write a drag class that finds the density from a `density(x)` method, and use it in `make_forces` in place of `QuadraticDrag`.
 
